@@ -1,402 +1,254 @@
 ---
 name: ITSM-workflows
-description: "Build, validate, and audit Tuva ITSM workflow JSON definitions — the directed cyclic graph structures that power agentic automation in the Tuva ITSM system. Use this skill any time the user wants to CREATE a new workflow, EDIT an existing workflow JSON, REVIEW a workflow for correctness, DEBUG a workflow that isn't executing properly, or understand any part of the Tuva workflow schema (nodes, post-conditions, soft storage, error handling, etc.). Trigger on phrases like: 'create a workflow', 'write the workflow JSON', 'build a workflow for', 'add a step to my workflow', 'validate this workflow', 'why isn't my workflow working', 'explain this workflow', 'what should the JSON look like', or any reference to workflow nodes, parameter steps, api_call steps, post_conditions, soft_storage, copy_params, or training_text. Always use this skill when the user is working with Tuva ITSM workflow definitions."
+description: "Generates, validates, and debugs ITSM workflow JSON definitions that drive agent behavior and execution in the Tuva ITSM system. Use when the task involves creating a new workflow from a Workflow Requirement Specification (WRS) document, editing an existing workflow JSON, reviewing a workflow for correctness, debugging workflow execution issues, or understanding workflow schema components such as nodes, post-conditions, soft storage, copy_params, silent_loading, or error handling."
+
 ---
 
-# Tuva ITSM Workflows
- 
-You are an expert author and reviewer of Tuva ITSM workflow JSON definitions.
- 
+# ITSM Workflow Generation
+
+This skill produces valid workflow JSON definitions from a Workflow Requirement Specification (WRS) document. Workflows are directed cyclic graphs of nodes that an AI agent discovers, initializes, and drives to completion. The JSON defines *what* the agent does — parameter collection, API calls, conditional routing, error handling — while the agent handles conversation and decision-making.
+
+Every workflow is stored in MongoDB and discovered via semantic search against its `training_text` in Milvus. The engine loops: execute `current_step` → evaluate `post_conditions` → move to `default_step` or `true_step` → repeat until `<--|end-of-flow|-->`.
+
 ---
- 
-## ⚠️  AUTHORITATIVE REFERENCES — READ BEFORE WRITING ANY JSON
- 
-Two files in this skill are the ground truth. Consult them before generating or validating
-any workflow. No assumption, pattern, or convention takes precedence over these documents.
- 
-| File | What it is |
-|------|-----------|
-| `references/spec.md` | The complete official specification. Every field, every rule, every constraint. |
-| `references/examples/create_zendesk_ticket.json` | A real production workflow. This is the gold standard for JSON structure and conventions. When in doubt, match this file's style exactly. |
- 
-**Rule:** If anything in this SKILL.md conflicts with `references/spec.md` or
-`references/examples/create_zendesk_ticket.json`, the spec and example win.
- 
+
+## Mandatory Pre-Reading
+
+Before generating or modifying any workflow, read these two documents in full:
+
+1. **`references/08-best-practices.md`** — Design principles, naming conventions, validation strategy, performance rules.
+2. **`references/01-what-is-a-workflow.md`** — System architecture, execution loop, agent-workflow communication, state model.
+
+These are non-negotiable. Skip them and the workflow will have structural or behavioral defects.
+
 ---
- 
-## Core Mental Model
- 
-A workflow is a **Directed Cyclic Graph (DCG)** of nodes. The AI agent:
-1. **Discovers** the workflow via semantic search on `training_text`
-2. **Initializes** it (loads the JSON, sets `current_step`)
-3. **Drives** it to completion by iteratively calling "Submit Information"
-Two node types exist:
-- **`parameter`** — Collects user input, stores it, optionally validates it
-- **`api_call`** — Calls an external API, routes on results, stores response data
-The engine loops: execute `current_step` → evaluate `post_conditions` → move to `default_step`
-(or a `true_step`) → repeat until `<--|end-of-flow|-->`.
- 
+
+## References Usage Matrix
+
+| Document | Purpose | When to Use |
+|----------|---------|-------------|
+| `references/01-what-is-a-workflow.md` | System architecture, execution loop, discovery model | **Always** — read before starting any workflow task |
+| `references/02-workflow-json-structure.md` | Top-level metadata fields and `steps` object schema | When writing the workflow skeleton and metadata |
+| `references/03-node-types-and-structure.md` | Common node properties, `__SOFT_STORAGE__`, `<--|end-of-flow|-->` | When designing the node graph and special constructs |
+| `references/04-parameter-node.md` | Parameter definition: `value`, `llm_key`, `datatype`, `validation`, `available_options`, `is_optional`, `retry_count` | When building any parameter collection node |
+| `references/05-api-call-node.md` | API call structure: `api_endpoint`, `prefill_params`, `copy_params`, `on_error`, `is_silent_step`, `soft_storage_params`, `set_available_options` | When building any API call node |
+| `references/06-post-conditions.md` | Conditional branching: `logical_operator`, `conditions`, `true_step`, operators, functions | When adding conditional routing to any node |
+| `references/07-error-handling.md` | Error codes, propagation model, `on_error` vs `post_conditions`, retry logic | When designing error paths and resilience |
+| `references/08-best-practices.md` | Design principles, naming, validation strategy, performance | **Always** — read before starting any workflow task |
+| `references/copy-params.md` | Passing data between nodes via `copy_params` | When wiring data flow between parameter and API nodes |
+| `references/validation.md` | Local validation (regex, range, len) and remote API validation | When adding input validation to parameters |
+| `references/silent-loading.md` | Auto-filling parameter values from prior API responses | When a parameter value can be inferred from a prior API call |
+| `references/error-handling.md` | Quick reference card for error codes and routing decisions | When configuring `on_error` mappings |
+
 ---
- 
-## Step-by-Step Workflow Creation Process
- 
-### Step 1 — Understand the Business Process
-Before writing JSON, clarify:
-- What data must be collected from the user?
-- What API calls must be made, and in what order?
-- What can go wrong, and how should each error be handled?
-- Is any data shared with or from other workflows (soft storage)?
-- Is the user potentially already authenticated (soft storage session check)?
-### Step 2 — Design the Graph First
-Sketch the node sequence before writing JSON:
+
+## Workflow Creation Lifecycle
+
+Follow these phases sequentially. Each phase has a clear deliverable.
+
+### Phase 1 — Analyze the WRS
+
+Read the Workflow Requirement Specification document given by the user completely. Extract:
+- The business objective (what the workflow accomplishes)
+- All data points to collect from the user
+- All API operations required
+- Conditional logic and branching requirements
+- Error scenarios and recovery expectations
+- Cross-workflow data needs (soft storage)
+
+If the WRS is ambiguous or incomplete on any point, make a reasonable assumption and document it in the DECISIONS file (see Phase 6). Do not halt generation.
+
+### Phase 2 — Design the Node Graph
+
+Sketch the directed graph before writing JSON. Identify:
+- The entry point (usually `__SOFT_STORAGE__` with session-aware routing)
+- Each parameter collection node and what it collects
+- Each API call node and what it executes
+- Transitions between nodes (`default_step` and conditional `true_step`)
+- Error handler nodes and terminal paths to `<--|end-of-flow|-->`
+- Points where `set_available_options` pre-populates dynamic choices
+- Points where `silent_loading` avoids redundant user prompts
+- Points where `soft_storage_params` persists session data
+
+Confirm every node is reachable from `current_step` and at least one path reaches `<--|end-of-flow|-->`.
+
+### Phase 3 — Write the Metadata
+
+Build the top-level fields following `references/02-workflow-json-structure.md`:
+- `workflow_id` — UUID, no hyphens preferred
+- `workflow_name` — action-oriented (e.g., "Create Incident Ticket")
+- `workflow_description` — concise but complete objective and use cases
+- `training_text` — 20+ natural language phrasings covering synonyms, short forms, and the description itself
+- `executed_steps` — always `[]`
+- `current_step` — typically `"__SOFT_STORAGE__"`
+- `is_workflow_ended` — always `false`
+
+
+
+### Phase 4 — Build the Nodes
+
+Write each node following the reference documents. Key structural rules:
+
+**Parameter nodes** (see `references/04-parameter-node.md`):
+- Every parameter must have: `value` (always `""`), `llm_key`, `description`, `datatype`, `validation`, `available_options`, `is_optional`
+- Set `retry_count` on any parameter with non-empty `validation`
+- Group related parameters in one node; separate different stages into different nodes
+- Use `|` separator in node names for multi-parameter collection: `"collect_subject_|_comment_|_priority"`
+
+**API call nodes** (see `references/05-api-call-node.md`):
+- Always include `"inputs": {}` and `"response": {}`
+- `api_endpoint` is the relative path only — no protocol prefix
+- Define `on_error` for at minimum `500` (server errors)
+- Use `is_silent_step` to suppress background operation successes from the user
+- Use `copy_params` to wire data from prior nodes into the API payload (see `references/copy-params.md`)
+
+**Validation** (see `references/validation.md`):
+- Static validation uses `function` + `criteria` + `operator` (e.g., regex email check)
+- Dynamic validation uses `condition_step` + `condition_key` + `condition_source` + `operator` (no `function` or `criteria`)
+- A parameter supports only one `validation` object; for complex validation, chain a dedicated `api_call` node after collection
+
+**Post-conditions** (see `references/06-post-conditions.md`):
+- `logical_operator` is `"and"`, `"or"`, or `""` (single condition)
+- Maximum 2 conditions per post-condition object
+- Evaluated in array order; first match wins
+- `__SOFT_STORAGE__` can and should have post-conditions for session-aware routing
+
+**Soft storage** (see `references/03-node-types-and-structure.md`):
+- `__SOFT_STORAGE__` is always a parameter node with `"params": {}`
+- Data persists for the entire user session across workflows
+- When storing from API response: include `"source": "response"` in `soft_storage_params` keys
+- When storing from parameter value: omit `source` entirely
+
+**Silent loading** (see `references/silent-loading.md`):
+- Use to auto-fill parameter values from prior API responses without prompting
+- Source must be an `api_call` node that has already executed
+- Use `$` as the nested field path separator in `source_field`
+
+### Phase 5 — Validate
+
+Run through the validation checklist below. Every item must pass before the workflow is considered complete.
+
+### Phase 6 — Write the DECISIONS Document
+
+Create a companion document listing every assumption, placeholder, and design decision made during generation. Structure it as:
+
 ```
-__SOFT_STORAGE__ [check auth?] → collect_info → api_call → end / error_node
+## Assumptions
+- [assumption description] — [rationale]
+
+## Placeholders
+- [field or value] — [what needs to be filled in and by whom]
+
+## Design Decisions
+- [decision] — [why this approach was chosen over alternatives]
 ```
-Identify all branching points, retry loops, and terminal paths.
- 
-### Step 3 — Write the Metadata Section
-```json
-{
-  "workflow_id": "<uuid>",
-  "workflow_name": "<Action-Oriented Name>",
-  "workflow_description": "<concise description>",
-  "training_text": "<25+ natural language query phrasings>",
-  "executed_steps": [],
-  "current_step": "__SOFT_STORAGE__",
-  "is_workflow_ended": false,
-  "steps": { ... }
-}
-```
- 
-### Step 4 — Write Each Node
-Follow the exact field order and structure shown in `references/examples/create_zendesk_ticket.json`.
- 
-### Step 5 — Wire Post-Conditions
-Add `post_conditions` to any node that needs conditional branching.
- 
-### Step 6 — Validate Against the Checklist
-Run through the full **Pre-Flight Checklist** below before presenting the workflow.
- 
+
+This document is a mandatory deliverable alongside the workflow JSON.
+
 ---
- 
-## Verified Production Patterns
- 
-These patterns are extracted directly from `references/examples/create_zendesk_ticket.json`.
-They override any earlier assumptions.
- 
-### 1. `inputs: {}` is REQUIRED on every api_call node
- 
-Every `api_call` node must have `"inputs": {}` as a field. This field is always empty `{}`.
-It is NOT documented in the spec but IS present in every production api_call node.
- 
-```json
-"my_api_node": {
-  "type": "api_call",
-  "inputs": {},
-  "response": {},
-  "api_endpoint": "service/operation",
-  ...
-}
-```
- 
-### 2. Node naming convention with `|` separator
- 
-When a node collects multiple related items, use `|` as a separator in the name:
-```
-"collect_user_name_|_email"
-"get_ticket_type_|_priority"
-"collect_subject_|_comment_|_group_name_|_priority_|_type"
-```
-This is a production convention — use it for multi-param collection nodes.
- 
-### 3. `__SOFT_STORAGE__` can and should have `post_conditions`
- 
-Soft storage is NOT just a passive cache. It can route based on prior session state.
-The Zendesk workflow uses it to skip authentication if the user is already authenticated:
- 
-```json
-"__SOFT_STORAGE__": {
-  "type": "parameter",
-  "params": {},
-  "post_conditions": [
-    {
-      "logical_operator": "",
-      "conditions": [
-        {
-          "key": "is_user_authenticated",
-          "step": "__SOFT_STORAGE__",
-          "criteria": true,
-          "operator": "=="
-        }
-      ],
-      "true_step": "verify_user_role"
-    }
-  ],
-  "default_step": "collect_user_name_|_email"
-}
-```
-Always consider: should this workflow skip steps if the user is already authenticated?
- 
-### 4. `set_available_options.set_from` is the bare field name — NOT `response.field`
- 
-Wrong (what the spec example shows):
-```json
-{ "set_from": "response.departments", ... }
-```
-Correct (what production uses):
-```json
-{ "set_from": "ticket_types", ... }
-{ "set_from": "priority_options", ... }
-{ "set_from": "groups", ... }
-```
-`set_from` is just the field name from the API response object — no `response.` prefix.
- 
-### 5. `soft_storage_params` without `source` copies from a parameter node's value
- 
-When persisting data from a **parameter node** (not an API response) to soft storage,
-omit the `source` field entirely:
- 
-```json
-"soft_storage_params": [
-  {
-    "keys": [
-      {
-        "get_from": "is_user_authenticated",
-        "set_to": "is_user_authenticated",
-        "source": "response"
-      }
-    ],
-    "step": "validate_otp"
-  },
-  {
-    "keys": [
-      {
-        "get_from": "user_email",
-        "set_to": "user_email"
-      }
-    ],
-    "step": "collect_user_name_|_email"
-  }
-]
-```
-- With `source: "response"` → reading from the node's API response
-- Without `source` → reading from the node's parameter value directly
-### 6. Validation can use dynamic references without `function` or `criteria`
- 
-When validating against values returned by an API call, use only the dynamic reference fields:
- 
-```json
-"validation": {
-  "condition_step": "get_groups",
-  "condition_key": "groups",
-  "condition_source": "response",
-  "operator": "in"
-}
-```
-No `function`, no `criteria` needed — the dynamic reference IS the validation target.
-Compare this to static regex validation which DOES use `function` and `criteria`:
-```json
-"validation": {
-  "function": "regex",
-  "criteria": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-}
-```
- 
-### 7. `retry_count` belongs on api_call nodes too, not only parameter nodes
- 
-The `validate_otp` api_call node has `"retry_count": 3` at the node level.
-Use this on any API call that should be retried on transient failure.
- 
-### 8. `on_error` can route directly to `<--|end-of-flow|-->`
- 
-Not every error needs a dedicated error node. Routing directly to end-of-flow is valid
-and common for unrecoverable errors:
-```json
-"on_error": {
-  "500": "<--|end-of-flow|-->",
-  "708": "<--|end-of-flow|-->"
-}
-```
- 
-### 9. Do NOT include `_id` in authored workflows
- 
-The `_id: { "$oid": "..." }` field is added by MongoDB at insert time.
-Never include it in the JSON you write.
- 
----
- 
-## Quick Reference: Node Skeletons
- 
-### `__SOFT_STORAGE__` (with session-aware routing)
-```json
-"__SOFT_STORAGE__": {
-  "type": "parameter",
-  "params": {},
-  "post_conditions": [
-    {
-      "logical_operator": "",
-      "conditions": [
-        {
-          "key": "is_user_authenticated",
-          "step": "__SOFT_STORAGE__",
-          "criteria": true,
-          "operator": "=="
-        }
-      ],
-      "true_step": "first_step_after_auth"
-    }
-  ],
-  "default_step": "collect_user_email"
-}
-```
- 
-### Parameter Node (with dynamic validation)
-```json
-"collect_subject_|_comment_|_priority": {
-  "type": "parameter",
-  "params": {
-    "subject": {
-      "value": "",
-      "llm_key": "Subject",
-      "description": "Brief summary of the issue.",
-      "datatype": "str",
-      "validation": {},
-      "available_options": [],
-      "is_optional": false
-    },
-    "priority": {
-      "value": "",
-      "llm_key": "Priority",
-      "description": "Urgency level of the ticket.",
-      "datatype": "str",
-      "validation": {
-        "condition_step": "get_priority_options",
-        "condition_key": "priority_options",
-        "condition_source": "response",
-        "operator": "in"
-      },
-      "available_options": [],
-      "is_optional": false,
-      "retry_count": 3
-    }
-  },
-  "default_step": "create_ticket"
-}
-```
- 
-### API Call Node (full production structure)
-```json
-"create_ticket": {
-  "type": "api_call",
-  "inputs": {},
-  "response": {},
-  "api_endpoint": "zendesk/ticket-management",
-  "prefill_params": {
-    "routing_key": "create_ticket"
-  },
-  "copy_params": [
-    {
-      "keys": [
-        { "copy_from": "subject", "copy_to": "subject" },
-        { "copy_from": "priority", "copy_to": "priority" }
-      ],
-      "step": "collect_subject_|_comment_|_priority"
-    },
-    {
-      "keys": [
-        { "copy_from": "user_email", "copy_to": "requester_email" }
-      ],
-      "step": "collect_user_name_|_email"
-    }
-  ],
-  "on_error": {
-    "500": "<--|end-of-flow|-->",
-    "708": "<--|end-of-flow|-->"
-  },
-  "default_step": "<--|end-of-flow|-->"
-}
-```
- 
-### API Call Node (with set_available_options — correct format)
-```json
-"get_ticket_type_|_priority": {
-  "type": "api_call",
-  "inputs": {},
-  "response": {},
-  "api_endpoint": "zendesk/ticket-management",
-  "prefill_params": {
-    "routing_key": "get_ticket_fields"
-  },
-  "set_available_options": [
-    {
-      "set_from": "ticket_types",
-      "set_to": "type",
-      "set_step": "collect_subject_|_comment_|_priority"
-    },
-    {
-      "set_from": "priority_options",
-      "set_to": "priority",
-      "set_step": "collect_subject_|_comment_|_priority"
-    }
-  ],
-  "on_error": {
-    "500": "<--|end-of-flow|-->"
-  },
-  "default_step": "collect_subject_|_comment_|_priority"
-}
-```
- 
----
- 
-## Pre-Flight Validation Checklist
- 
+
+## Validation Checklist
+
 ### Metadata
-- [ ] `workflow_id` is present (UUID, no hyphens preferred)
-- [ ] `workflow_name` starts with an action verb ("Create", "Fetch", "Reset", etc.)
-- [ ] `workflow_description` describes objective and use cases clearly
-- [ ] `training_text` has 20+ natural language phrasings (see Zendesk example for density)
+- [ ] `workflow_id` present (UUID format)
+- [ ] `workflow_name` starts with action verb
+- [ ] `workflow_description` covers objective and use cases
+- [ ] `training_text` has 20+ natural phrasings with synonyms
 - [ ] `executed_steps` is `[]`
-- [ ] `current_step` is `"__SOFT_STORAGE__"`
+- [ ] `current_step` is `"__SOFT_STORAGE__"` (or the correct entry node)
 - [ ] `is_workflow_ended` is `false`
-- [ ] No `_id` field present
-### Structural Integrity
-- [ ] `__SOFT_STORAGE__` is defined in `steps` with `params: {}`
+- [ ] No `_id` field
+
+### Graph Integrity
+- [ ] `__SOFT_STORAGE__` is defined in `steps` with `"params": {}`
 - [ ] Every `default_step` references a valid node or `"<--|end-of-flow|-->"`
-- [ ] Every `true_step` in post_conditions references a valid node or end-of-flow marker
+- [ ] Every `true_step` references a valid node or `"<--|end-of-flow|-->"`
 - [ ] Every `on_error` code maps to a valid node or `"<--|end-of-flow|-->"`
 - [ ] No orphan nodes (all nodes reachable from `current_step`)
 - [ ] At least one path reaches `"<--|end-of-flow|-->"`
+- [ ] No infinite loops without retry limits
+
 ### Parameter Nodes
 - [ ] Every parameter has: `value: ""`, `llm_key`, `description`, `datatype`, `validation`, `available_options`, `is_optional`
 - [ ] `value` is always `""`
 - [ ] `available_options` is `[]` when dynamically populated
-- [ ] `retry_count` is set for any parameter with a non-empty `validation`
-- [ ] Dynamic validation uses `condition_step` + `condition_key` + `condition_source` + `operator` (no `function` or `criteria`)
-- [ ] Static validation uses `function` + `criteria` (regex, len, range, etc.)
+- [ ] `retry_count` set for parameters with non-empty `validation`
+- [ ] Dynamic validation uses `condition_step`/`condition_key`/`condition_source`/`operator`
+- [ ] Static validation uses `function`/`criteria`/`operator`
+
 ### API Call Nodes
-- [ ] `inputs: {}` is present on every api_call node
-- [ ] `response: {}` is present on every api_call node
-- [ ] `api_endpoint` is a path only — no protocol prefix
-- [ ] `set_available_options.set_from` is the bare field name (NOT `response.field_name`)
-- [ ] `soft_storage_params` key has `source: "response"` when reading from API response
-- [ ] `soft_storage_params` key has NO `source` when reading from a parameter node's value
-- [ ] `on_error` is defined for all expected error scenarios
-- [ ] `retry_count` is set on nodes with transient failure risk
+- [ ] `"inputs": {}` present on every api_call node
+- [ ] `"response": {}` present on every api_call node
+- [ ] `api_endpoint` has no protocol prefix
+- [ ] `on_error` defined with at minimum `500`
+- [ ] `set_available_options.set_from` is the bare field name (not `response.field`)
+- [ ] `soft_storage_params` uses `"source": "response"` for API response data
+- [ ] `soft_storage_params` omits `source` for parameter value data
+
 ### Post-Conditions
 - [ ] `logical_operator` is `"and"`, `"or"`, or `""`
-- [ ] Max 2 conditions when using `logical_operator`
+- [ ] Max 2 conditions per post-condition object
 - [ ] Each condition has `key`, `step`, `operator`
-- [ ] `source` is `"response"` or `"response.field_name"` when reading from API response
-- [ ] `source` is omitted when reading from parameter value
+
+### JSON Integrity
+- [ ] Valid JSON (no comments, no trailing commas)
+- [ ] All field names are case-sensitive and match the reference documents exactly
+- [ ] No extra fields beyond what the reference documents define
+
 ---
- 
-## Reference Files
- 
-| File | When to Read |
-|------|-------------|
-| `references/spec.md` | **Always** — the authoritative specification for every field and rule |
-| `references/examples/*` | **When Reviewing** — the gold standard production workflow; match these styles based on the needs |
-| `references/field-reference.md` | Full property specs and corrected field details |
-| `references/patterns.md` | Advanced patterns: dynamic options, cross-workflow sharing, retry loops |
-| `references/error-codes.md` | Standard error codes and routing guidance |
- 
+
+## Debugging Strategy
+
+When a workflow fails or behaves unexpectedly, follow this sequence:
+
+1. **Identify the failing node** — Check `current_step` and `executed_steps` to locate where execution stopped.
+2. **Inspect the node definition** — Read the corresponding reference document for that node type and verify every field matches the spec.
+3. **Trace data flow** — Follow `copy_params` chains backward to confirm source values exist and `source` flags are correct.
+4. **Check post-conditions** — Verify condition evaluation order, `logical_operator`, and that `step`/`source` references point to the right data.
+5. **Verify error routing** — Confirm `on_error` covers the returned error code and routes to a valid node.
+6. **Compare against best practices** — Re-read `references/08-best-practices.md` for patterns the workflow may violate.
+7. **Compare against examples** — Check `examples/` for production workflows that handle similar patterns.
+
+If the issue is still unclear, re-read the specific reference document for the construct involved (validation, silent loading, copy params, etc.) and cross-reference against the example workflows.
+
+---
+
+## Thinking Strategy
+
+When approaching a workflow generation task, reason through it in this order:
+
+1. **What is the end goal?** — What business outcome does the WRS describe?
+2. **What data is needed?** — What must be collected from the user vs. fetched from APIs vs. read from soft storage?
+3. **What is the sequence?** — What depends on what? Which API calls gate which parameter collections?
+4. **What can go wrong?** — Map every error scenario to a recovery path or clean termination.
+5. **What can be optimized?** — Can any prompts be skipped via `silent_loading`? Can any data be cached in `__SOFT_STORAGE__`?
+6. **Does it follow the spec?** — Run the validation checklist before finalizing.
+
+Do not invent patterns, field names, or behaviors beyond what the reference documents define. When uncertain, fall back to the reference documents and the example workflows in `examples/`.
+
+---
+
+## Reference Examples
+
+Production workflow examples are in `examples/`. Use them to verify structural patterns and field conventions. Match their style for field ordering, naming, and structure. Available examples:
+
+- `examples/view_single_zendesk_ticket.json` — Read-only ticket lookup flow
+
+---
+
+## Quick Reference: Key Patterns
+
+**Session-aware entry via `__SOFT_STORAGE__`:**
+Use post-conditions on `__SOFT_STORAGE__` to skip authentication if the user is already authenticated. Route to the first post-auth step via `true_step`, and to credential collection via `default_step`.
+
+**Dynamic option population:**
+Use an `api_call` node with `set_available_options` to fetch valid choices *before* the parameter node that collects the user's selection. The `set_from` value is the bare field name from the API response (not prefixed with `response.`).
+
+**Cross-node data wiring:**
+Use `copy_params` to pass collected parameter values or API response fields into downstream API call payloads. Omit `source` for parameter values; use `"source": "response"` for API response fields.
+
+**Error routing:**
+Use `on_error` for unexpected failures requiring immediate redirection. Use `post_conditions` for expected business logic branching (e.g., success vs. validation failure). Route directly to `<--|end-of-flow|-->` for unrecoverable errors.
+
+**Soft storage persistence:**
+Persist authentication tokens, user identity, or session context via `soft_storage_params` on `api_call` nodes. Include `"source": "response"` when storing from API responses; omit `source` when storing from parameter values.
