@@ -1,0 +1,369 @@
+{
+  "_id": {
+    "$oid": "69087b0426f3cd27bf5d39a3"
+  },
+  "workflow_id": "568a77f39fa949deb74656f6c8a79a61",
+  "workflow_name": "Create Zendesk Ticket",
+  "workflow_description": "This operation is used to create a new support ticket in Zendesk for internal support purposes. The system should collect basic user identity, verify it through an OTP, gather necessary ticket details (like subject, comment, priority, etc.), and then create the ticket in Zendesk.",
+  "executed_steps": [],
+  "current_step": "__SOFT_STORAGE__",
+  "is_workflow_ended": false,
+  "steps": {
+    "__SOFT_STORAGE__": {
+      "type": "parameter",
+      "params": {},
+      "post_conditions": [
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "is_user_authenticated",
+              "step": "__SOFT_STORAGE__",
+              "criteria": true,
+              "operator": "=="
+            }
+          ],
+          "true_step": "verify_user_role"
+        }
+      ],
+      "default_step": "collect_user_name_|_email"
+    },
+    "collect_user_name_|_email": {
+      "type": "parameter",
+      "params": {
+        "user_email": {
+          "value": "",
+          "llm_key": "Email",
+          "description": "Email address of the base user performing the operation.",
+          "datatype": "str",
+          "validation": {
+            "criteria": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "function": "regex"
+          },
+          "available_options": [],
+          "is_optional": false,
+          "retry_count": 3
+        }
+      },
+      "default_step": "verify_user_role"
+    },
+    "verify_user_role": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "api_endpoint": "zendesk/user-management",
+      "prefill_params": {
+        "routing_key": "get_role_by_email",
+        "operation": "create"
+      },
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "701": "get_ticket_type_|_priority"
+      },
+      "post_conditions": [
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "role",
+              "step": "verify_user_role",
+              "source": "response",
+              "criteria": "contributor",
+              "operator": "=="
+            }
+          ],
+          "true_step": "<--|end-of-flow|-->"
+        },
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "is_user_authenticated",
+              "step": "__SOFT_STORAGE__",
+              "criteria": true,
+              "operator": "=="
+            }
+          ],
+          "true_step": "get_ticket_type_|_priority"
+        }
+      ],
+      "default_step": "send_email_otp"
+    },
+    "send_email_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "send-otp",
+      "prefill_params": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "default_step": "collect_otp"
+    },
+    "collect_otp": {
+      "type": "parameter",
+      "params": {
+        "user_provided_otp": {
+          "value": "",
+          "llm_key": "OTP",
+          "description": "One time password(OTP) sent on provided Email.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        }
+      },
+      "default_step": "validate_otp"
+    },
+    "validate_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_provided_otp",
+              "copy_to": "user_input_otp"
+            }
+          ],
+          "step": "collect_otp"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "otp_validity_seconds",
+              "copy_to": "otp_validity_time",
+              "source": "response"
+            },
+            {
+              "copy_from": "timestamp_utc",
+              "copy_to": "start_time",
+              "source": "response"
+            },
+            {
+              "copy_from": "otp",
+              "copy_to": "original_otp",
+              "source": "response"
+            }
+          ],
+          "step": "send_email_otp"
+        }
+      ],
+      "prefill_params": {},
+      "api_endpoint": "validate-otp",
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "701": "collect_otp",
+        "702": "send_email_otp"
+      },
+      "retry_count": 3,
+      "soft_storage_params": [
+        {
+          "keys": [
+            {
+              "get_from": "is_user_authenticated",
+              "set_to": "is_user_authenticated",
+              "source": "response"
+            }
+          ],
+          "step": "validate_otp"
+        },
+        {
+          "keys": [
+            {
+              "get_from": "user_email",
+              "set_to": "user_email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "default_step": "get_ticket_type_|_priority"
+    },
+    "get_ticket_type_|_priority": {
+      "type": "api_call",
+      "set_available_options": [
+        {
+          "set_from": "ticket_types",
+          "set_to": "type",
+          "set_step": "collect_subject_|_comment_|_group_name_|_priority_|_type"
+        },
+        {
+          "set_from": "priority_options",
+          "set_to": "priority",
+          "set_step": "collect_subject_|_comment_|_group_name_|_priority_|_type"
+        }
+      ],
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "zendesk/ticket-management",
+      "prefill_params": {
+        "routing_key": "get_ticket_fields"
+      },
+      "on_error": {
+        "500": "<--|end-of-flow|-->"
+      },
+      "default_step": "get_groups"
+    },
+    "get_groups": {
+      "type": "api_call",
+      "set_available_options": [
+        {
+          "set_from": "groups",
+          "set_to": "group_name",
+          "set_step": "collect_subject_|_comment_|_group_name_|_priority_|_type"
+        }
+      ],
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "zendesk/user-management",
+      "prefill_params": {
+        "routing_key": "get_group_names"
+      },
+      "on_error": {
+        "500": "<--|end-of-flow|-->"
+      },
+      "default_step": "collect_subject_|_comment_|_group_name_|_priority_|_type"
+    },
+    "collect_subject_|_comment_|_group_name_|_priority_|_type": {
+      "type": "parameter",
+      "params": {
+        "subject": {
+          "value": "",
+          "llm_key": "Subject",
+          "description": "A brief summary or title of the ticket describing the main issue or request.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        },
+        "comment": {
+          "value": "",
+          "llm_key": "Comment",
+          "description": "A detailed explanation for the ticket",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        },
+        "group_name": {
+          "value": "",
+          "llm_key": "Group name",
+          "description": "Group name to whom the ticket should be assigned.",
+          "datatype": "str",
+          "validation": {
+            "condition_step": "get_groups",
+            "condition_key": "groups",
+            "condition_source": "response",
+            "operator": "in"
+          },
+          "available_options": [],
+          "is_optional": false,
+          "retry_count": 3
+        },
+        "priority": {
+          "value": "",
+          "llm_key": "Priority",
+          "description": "The urgency level of the ticket.",
+          "datatype": "str",
+          "validation": {
+            "condition_step": "get_ticket_type_|_priority",
+            "condition_key": "priority_options",
+            "condition_source": "response",
+            "operator": "in"
+          },
+          "available_options": [],
+          "is_optional": false,
+          "retry_count": 3
+        },
+        "type": {
+          "value": "",
+          "llm_key": "Ticket type",
+          "description": "The category or nature of the ticket.",
+          "datatype": "str",
+          "validation": {
+            "condition_step": "get_ticket_type_|_priority",
+            "condition_key": "ticket_types",
+            "condition_source": "response",
+            "operator": "in"
+          },
+          "available_options": [],
+          "is_optional": false,
+          "retry_count": 3
+        }
+      },
+      "default_step": "create_zendesk_ticket"
+    },
+    "create_zendesk_ticket": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "prefill_params": {
+        "routing_key": "create_ticket"
+      },
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "subject",
+              "copy_to": "subject"
+            },
+            {
+              "copy_from": "comment",
+              "copy_to": "comment"
+            },
+            {
+              "copy_from": "priority",
+              "copy_to": "priority"
+            },
+            {
+              "copy_from": "type",
+              "copy_to": "ticket_type"
+            },
+            {
+              "copy_from": "group_name",
+              "copy_to": "group_name"
+            }
+          ],
+          "step": "collect_subject_|_comment_|_group_name_|_priority_|_type"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "requester_email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "api_endpoint": "zendesk/ticket-management",
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "708": "<--|end-of-flow|-->"
+      },
+      "default_step": "<--|end-of-flow|-->"
+    }
+  },
+  "training_text": "Create a support ticket,\\nI want to log a ticket,\\nRaise a support request,\\nOpen a Zendesk ticket,\\nReport an issue,\\nStart a support request,\\nLog an internal issue,\\nSubmit a new ticket,\\nI need help with a problem,\\nHelp me raise a ticket,\\nSend this issue to support,\\nFile a support request,\\nInitiate a ticket,\\nEscalate this issue,\\nI need to create a helpdesk ticket,\\nCan you log a support request for me?,\\nPlease open a support case,\\nRaise a helpdesk ticket,\\nFile an internal issue,\\nSomething is broken – report it,\\nSubmit this issue to the support team,\\nCan we create a Zendesk request?,\\nTrigger a new ticket,\\nStart the support process,\\nI need to report a problem,\\nLog a case with the helpdesk,\\nReach out to support for me"
+}

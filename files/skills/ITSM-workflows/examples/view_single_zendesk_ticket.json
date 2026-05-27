@@ -1,0 +1,288 @@
+{
+  "_id": {
+    "$oid": "69087b1c26f3cd27bf5d39a4"
+  },
+  "workflow_id": "a2978d82fdb74167a7fc5215decdc468",
+  "workflow_name": "View Single Zendesk Ticket",
+  "workflow_description": "Retrieves detailed information about a specific Zendesk ticket using its ticket ID. Provides key details such as requester, assignee, status, priority, type.",
+  "executed_steps": [],
+  "current_step": "__SOFT_STORAGE__",
+  "is_workflow_ended": false,
+  "steps": {
+    "__SOFT_STORAGE__": {
+      "type": "parameter",
+      "params": {},
+      "post_conditions": [
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "is_user_authenticated",
+              "step": "__SOFT_STORAGE__",
+              "criteria": true,
+              "operator": "=="
+            }
+          ],
+          "true_step": "verify_user_role"
+        }
+      ],
+      "default_step": "collect_user_name_|_email"
+    },
+    "collect_user_name_|_email": {
+      "type": "parameter",
+      "params": {
+        "user_email": {
+          "value": "",
+          "llm_key": "Email",
+          "description": "Email address of the base user performing the operation.",
+          "datatype": "str",
+          "validation": {
+            "criteria": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "function": "regex"
+          },
+          "available_options": [],
+          "is_optional": false,
+          "retry_count": 3
+        }
+      },
+      "default_step": "verify_user_role"
+    },
+    "verify_user_role": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "api_endpoint": "zendesk/user-management",
+      "prefill_params": {
+        "routing_key": "get_role_by_email",
+        "operation": "view"
+      },
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "701": "<--|end-of-flow|-->"
+      },
+      "post_conditions": [
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "role",
+              "step": "verify_user_role",
+              "source": "response",
+              "criteria": "end-user",
+              "operator": "=="
+            }
+          ],
+          "true_step": "<--|end-of-flow|-->"
+        },
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "is_user_authenticated",
+              "step": "__SOFT_STORAGE__",
+              "criteria": true,
+              "operator": "=="
+            }
+          ],
+          "true_step": "get_ticket_id"
+        }
+      ],
+      "default_step": "send_email_otp"
+    },
+    "send_email_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "send-otp",
+      "prefill_params": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "default_step": "collect_otp"
+    },
+    "collect_otp": {
+      "type": "parameter",
+      "params": {
+        "user_provided_otp": {
+          "value": "",
+          "llm_key": "OTP",
+          "description": "One time password(OTP) sent on provided Email.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        }
+      },
+      "default_step": "validate_otp"
+    },
+    "validate_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_provided_otp",
+              "copy_to": "user_input_otp"
+            }
+          ],
+          "step": "collect_otp"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "otp_validity_seconds",
+              "copy_to": "otp_validity_time",
+              "source": "response"
+            },
+            {
+              "copy_from": "timestamp_utc",
+              "copy_to": "start_time",
+              "source": "response"
+            },
+            {
+              "copy_from": "otp",
+              "copy_to": "original_otp",
+              "source": "response"
+            }
+          ],
+          "step": "send_email_otp"
+        }
+      ],
+      "prefill_params": {},
+      "api_endpoint": "validate-otp",
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "701": "collect_otp",
+        "702": "send_email_otp"
+      },
+      "retry_count": 3,
+      "soft_storage_params": [
+        {
+          "keys": [
+            {
+              "get_from": "is_user_authenticated",
+              "set_to": "is_user_authenticated",
+              "source": "response"
+            }
+          ],
+          "step": "validate_otp"
+        },
+        {
+          "keys": [
+            {
+              "get_from": "user_email",
+              "set_to": "user_email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "default_step": "get_ticket_id"
+    },
+    "get_ticket_id": {
+      "type": "parameter",
+      "params": {
+        "ticket_id": {
+          "value": "",
+          "llm_key": "Ticket ID",
+          "description": "ID of the ticket to be retrieved.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        }
+      },
+      "default_step": "validate_ticket_by_user_role"
+    },
+    "validate_ticket_by_user_role": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "ticket_id",
+              "copy_to": "ticket_id"
+            }
+          ],
+          "step": "get_ticket_id"
+        }
+      ],
+      "api_endpoint": "zendesk/ticket-management",
+      "prefill_params": {
+        "routing_key": "validate_ticket_by_user_role",
+        "operation": "view"
+      },
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "708": "get_ticket_id"
+      },
+      "default_step": "get_ticket_by_id"
+    },
+    "get_ticket_by_id": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "ticket_id",
+              "copy_to": "ticket_id"
+            }
+          ],
+          "step": "get_ticket_id"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "api_endpoint": "zendesk/ticket-management",
+      "prefill_params": {
+        "routing_key": "get_ticket_by_id"
+      },
+      "on_error": {
+        "500": "<--|end-of-flow|-->"
+      },
+      "default_step": "<--|end-of-flow|-->"
+    }
+  },
+  "training_text": "Show me ticket Ticket ID.\\nGet details of ticket Ticket ID.\\nView information about ticket with ID Ticket ID.\\nShow the status of ticket Ticket ID.\\nDisplay the requester and assignee for ticket Ticket ID.\\nWhat is the priority of ticket Ticket ID?\\nShow latest updates on ticket Ticket ID."
+}

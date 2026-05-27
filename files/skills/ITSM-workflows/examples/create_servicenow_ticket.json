@@ -1,0 +1,320 @@
+{
+  "workflow_id": "27ad7e58c26047b5bcb99c237ceafdc9",
+  "workflow_name": "Create Ticket ServiceNow",
+  "workflow_description": "Creates a new support ticket or incident in ServiceNow using user-provided issue details.",
+  "executed_steps": [],
+  "current_step": "__SOFT_STORAGE__",
+  "is_workflow_ended": false,
+  "steps": {
+    "__SOFT_STORAGE__": {
+      "type": "parameter",
+      "params": {},
+      "post_conditions": [
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "is_user_authenticated",
+              "step": "__SOFT_STORAGE__",
+              "criteria": true,
+              "operator": "=="
+            }
+          ],
+          "true_step": "get_user_roles"
+        }
+      ],
+      "default_step": "collect_user_name_|_email"
+    },
+    "collect_user_name_|_email": {
+      "type": "parameter",
+      "params": {
+        "user_email": {
+          "value": "",
+          "llm_key": "Email",
+          "description": "Email of the user for authentication in service now, e.g.(john.d@example.com)",
+          "datatype": "str",
+          "validation": {
+            "criteria": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+            "function": "regex"
+          },
+          "available_options": [],
+          "is_optional": false,
+          "retry_count": 3
+        }
+      },
+      "default_step": "authenticate_user"
+    },
+    "authenticate_user": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "validate-user",
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "701": "collect_user_name_|_email"
+      },
+      "default_step": "send_email_otp",
+      "retry_count": 3
+    },
+    "send_email_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "send-otp",
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "default_step": "collect_otp"
+    },
+    "collect_otp": {
+      "type": "parameter",
+      "params": {
+        "user_provided_otp": {
+          "value": "",
+          "llm_key": "OTP",
+          "description": "One time password(OTP) sent on provided Email.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        }
+      },
+      "default_step": "validate_otp"
+    },
+    "validate_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_provided_otp",
+              "copy_to": "user_input_otp"
+            }
+          ],
+          "step": "collect_otp"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "otp_validity_seconds",
+              "copy_to": "otp_validity_time",
+              "source": "response"
+            },
+            {
+              "copy_from": "timestamp_utc",
+              "copy_to": "start_time",
+              "source": "response"
+            },
+            {
+              "copy_from": "otp",
+              "copy_to": "original_otp",
+              "source": "response"
+            }
+          ],
+          "step": "send_email_otp"
+        }
+      ],
+      "api_endpoint": "validate-otp",
+      "default_step": "get_user_roles",
+      "on_error": {
+        "500": "<--|end-of-flow|-->",
+        "701": "collect_otp",
+        "702": "send_email_otp"
+      },
+      "retry_count": 3,
+      "soft_storage_params": [
+        {
+          "keys": [
+            {
+              "get_from": "is_user_authenticated",
+              "set_to": "is_user_authenticated",
+              "source": "response"
+            }
+          ],
+          "step": "validate_otp"
+        },
+        {
+          "keys": [
+            {
+              "get_from": "user_email",
+              "set_to": "user_email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ]
+    },
+    "get_user_roles": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "user_email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "api_endpoint": "get-user-roles-by-email",
+      "is_silent_step": {
+        "200": true
+      },
+      "default_step": "authorize_user"
+    },
+    "authorize_user": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "list_of_roles",
+              "copy_to": "user_roles",
+              "source": "response"
+            }
+          ],
+          "step": "get_user_roles"
+        }
+      ],
+      "prefill_params": {
+        "operation_name": "create_ticket"
+      },
+      "api_endpoint": "authorize-sn-user",
+      "on_error": {
+        "704": "<--|end-of-flow|-->"
+      },
+      "default_step": "collect_short_desc_|_detailed_desc_|_priority_|_impact"
+    },
+    "collect_short_desc_|_detailed_desc_|_priority_|_impact": {
+      "type": "parameter",
+      "params": {
+        "short_description": {
+          "value": "",
+          "llm_key": "Short Description",
+          "description": "Short description for the ticket to be raised.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": false
+        },
+        "description": {
+          "value": "",
+          "llm_key": "Description",
+          "description": "Description for the ticket to be raised.",
+          "datatype": "str",
+          "validation": {},
+          "available_options": [],
+          "is_optional": true
+        },
+        "urgency": {
+          "value": "",
+          "llm_key": "Urgency",
+          "description": "Urgency of the issue.",
+          "datatype": "str",
+          "validation": {
+            "criteria": [
+              "High",
+              "Medium",
+              "Low"
+            ],
+            "operator": "in"
+          },
+          "available_options": [
+            "High",
+            "Medium",
+            "Low"
+          ],
+          "is_optional": false
+        },
+        "impact": {
+          "value": "",
+          "llm_key": "Impact",
+          "description": "Impact of the issue.",
+          "datatype": "str",
+          "validation": {
+            "criteria": [
+              "High",
+              "Medium",
+              "Low"
+            ],
+            "operator": "in"
+          },
+          "available_options": [
+            "High",
+            "Medium",
+            "Low"
+          ],
+          "is_optional": false
+        }
+      },
+      "default_step": "create_ticket"
+    },
+    "create_ticket": {
+      "type": "api_call",
+      "inputs": {},
+      "api_endpoint": "create-incident",
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "short_description",
+              "copy_to": "short_description"
+            },
+            {
+              "copy_from": "description",
+              "copy_to": "detailed_information"
+            },
+            {
+              "copy_from": "urgency",
+              "copy_to": "urgency"
+            },
+            {
+              "copy_from": "impact",
+              "copy_to": "impact"
+            }
+          ],
+          "step": "collect_short_desc_|_detailed_desc_|_priority_|_impact"
+        },
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "caller_id"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "response": {},
+      "on_error": {},
+      "default_step": "<--|end-of-flow|-->"
+    }
+  },
+  "training_text": "I need to create a support ticket because my email isn't working. Can you raise a new IT request for me in ServiceNow? How do I log an incident? The purpose of this operation is: Creates a new support ticket or incident in ServiceNow using user-provided issue details."
+}
