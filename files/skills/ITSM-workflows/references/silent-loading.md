@@ -1,4 +1,4 @@
-# Reference: Silent Loading (`silent_loading`)
+# Silent Loading (`silent_loading`)
 
 ## Abstract
 

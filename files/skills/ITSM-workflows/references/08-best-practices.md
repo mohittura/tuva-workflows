@@ -14,7 +14,7 @@ Collect only the information needed at each stage of the process. Don't front-lo
 
 ### Defensive Validation
 Validate user input before sending it to backend systems. Use parameter-level `validation` rules for format checks (regex, range, length), and use `api_call` nodes for business-rule validation that requires a backend lookup.
-> See [`ref-validation.md`](./ref-validation.md).
+> See [`validation.md`](./validation.md).
 
 ### Graceful Degradation
 Every workflow should handle its failure cases with user-friendly responses. A workflow that can silently fail or get stuck is worse than one that clearly communicates the problem and exits cleanly.
@@ -75,7 +75,7 @@ If an API response contains data that other workflows in the session will need â
 
 ### Use Silent Loading for Pre-fill
 When a prior API call already returned data that a subsequent node needs in its `prefill_params`, use `silent_loading` instead of asking the user or duplicating the API call.
-> See [`ref-silent-loading.md`](./ref-silent-loading.md).
+> See [`silent-loading.md`](./silent-loading.md).
 
 ### Set `is_silent_step` Deliberately
 For background API calls (fetching lists, pre-validating tokens), set `200` to silent (`true`) so the user isn't narrated through invisible bookkeeping. But always keep failure codes visible (`false`) so the user can be informed if something goes wrong.

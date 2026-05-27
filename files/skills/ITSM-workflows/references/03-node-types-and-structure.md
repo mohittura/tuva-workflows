@@ -99,8 +99,8 @@ Each node type has its own dedicated document covering the full property specifi
 - **API Call Nodes** → [`05-api-call-node.md`](./05-api-call-node.md)
   Covers: `api_endpoint`, `prefill_params`, `copy_params`, `response`, `on_error`, `is_silent_step`, `soft_storage_params`, `retry_count`, `set_available_options`, `silent_loading`
 
-- **Copy Parameters** (used by both node types) → [`ref-copy-params.md`](./ref-copy-params.md)
+- **Copy Parameters** (used by both node types) → [`copy-params.md`](./copy-params.md)
 
-- **Validation** (used by parameter nodes and API call validation) → [`ref-validation.md`](./ref-validation.md)
+- **Validation** (used by parameter nodes and API call validation) → [`validation.md`](./validation.md)
 
-- **Silent Loading** (used to auto-fill values from API responses) → [`ref-silent-loading.md`](./ref-silent-loading.md)
+- **Silent Loading** (used to auto-fill values from API responses) → [`silent-loading.md`](./silent-loading.md)

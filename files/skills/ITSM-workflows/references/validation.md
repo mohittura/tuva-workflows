@@ -1,4 +1,4 @@
-# Reference: Validation
+# Validation
 
 Validation in the workflow engine ensures that a user's input satisfies defined rules before the value is accepted and stored. Validation is configured per-parameter inside a parameter node and supports both **local rules** (evaluated by the engine itself) and **remote rules** (evaluated by an external API call).
 

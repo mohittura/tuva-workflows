@@ -57,7 +57,7 @@ An API call node is the action component of a workflow. While parameter nodes co
   "source_system": "ITSM"
 }
 ```
-- **Note:** Values in `prefill_params` can also be auto-filled at runtime using `silent_loading`. See [`ref-silent-loading.md`](./ref-silent-loading.md).
+- **Note:** Values in `prefill_params` can also be auto-filled at runtime using `silent_loading`. See [`silent-loading.md`](./silent-loading.md).
 
 ---
 
@@ -67,7 +67,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 - **Required:** No
 - **Purpose:** Maps values from the workflow's current state (parameter values or prior API responses) into the request payload for this API call. This is the primary mechanism for passing dynamic data between nodes.
 
-> For full structure and all source options, see [`ref-copy-params.md`](./ref-copy-params.md).
+> For full structure and all source options, see [`copy-params.md`](./copy-params.md).
 
 ---
 
@@ -121,7 +121,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 ```
 - **Use Case:** Background API calls (fetching department lists, pre-validating data) where a success doesn't need to surface to the user, but failures should.
 
-> Note: `is_silent_step` controls agent visibility of the *result*. For pre-filling parameter values silently from API responses, see [`ref-silent-loading.md`](./ref-silent-loading.md).
+> Note: `is_silent_step` controls agent visibility of the *result*. For pre-filling parameter values silently from API responses, see [`silent-loading.md`](./silent-loading.md).
 
 ---
 
@@ -159,7 +159,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 - **Required:** No
 - **Purpose:** Automatically populates `prefill_params` values in this node from the response of a prior API call, without user interaction. This is the mechanism for chaining API calls where the output of one feeds the input of another invisibly.
 
-> For full usage, structure, and nested field access, see [`ref-silent-loading.md`](./ref-silent-loading.md).
+> For full usage, structure, and nested field access, see [`silent-loading.md`](./silent-loading.md).
 
 ---
 
@@ -197,8 +197,8 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ## Related References
 
-- [`ref-copy-params.md`](./ref-copy-params.md) — Passing parameter and response values into API payloads
-- [`ref-validation.md`](./ref-validation.md) — Using API calls for remote validation inside parameter nodes
-- [`ref-silent-loading.md`](./ref-silent-loading.md) — Auto-filling `prefill_params` from prior API responses
+- [`copy-params.md`](./copy-params.md) — Passing parameter and response values into API payloads
+- [`validation.md`](./validation.md) — Using API calls for remote validation inside parameter nodes
+- [`silent-loading.md`](./silent-loading.md) — Auto-filling `prefill_params` from prior API responses
 - [`07-error-handling.md`](./07-error-handling.md) — Error codes, `on_error` routing, and propagation model
 - [`06-post-conditions.md`](./06-post-conditions.md) — Conditional routing after API call completion

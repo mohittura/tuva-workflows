@@ -1,4 +1,4 @@
-# Reference: Copy Parameters (`copy_params`)
+# Copy Parameters (`copy_params`)
 
 `copy_params` is the primary mechanism for passing data between nodes in a workflow. It maps values from the workflow's current state — whether from a collected parameter or from a prior API call's response — into the payload of an outgoing API request.
 

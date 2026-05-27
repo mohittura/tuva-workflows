@@ -136,4 +136,4 @@ API call nodes support automatic retries for transient failures via the `retry_c
 
 - [`05-api-call-node.md`](./05-api-call-node.md) — `on_error`, `is_silent_step`, `retry_count` field specs
 - [`06-post-conditions.md`](./06-post-conditions.md) — Conditional routing including error-code-based branching
-- [`ref-error-handling.md`](./ref-error-handling.md) — Quick reference card: all error codes, propagation, and routing decision guide
+- [`error-handling.md`](./error-handling.md) — Quick reference card: all error codes, propagation, and routing decision guide

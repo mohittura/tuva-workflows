@@ -104,7 +104,7 @@ A single parameter node can collect multiple related fields at once. Group field
 - **Required:** No
 - **Purpose:** Defines one or more rules that the user's input must satisfy before the value is accepted. Supports both local rule-based validation and remote API-based validation.
 
-> For the full validation specification, supported functions, operators, and API validation structure, see [`ref-validation.md`](./ref-validation.md).
+> For the full validation specification, supported functions, operators, and API validation structure, see [`validation.md`](./validation.md).
 
 ---
 
@@ -152,13 +152,13 @@ A single parameter node can collect multiple related fields at once. Group field
 - **Required:** No
 - **Purpose:** Automatically pre-fills parameter values from the response of a previous API call node, without asking the user. If a value is successfully loaded silently, the engine skips prompting the user for that parameter.
 
-> For full usage and structure, see [`ref-silent-loading.md`](./ref-silent-loading.md).
+> For full usage and structure, see [`silent-loading.md`](./silent-loading.md).
 
 ---
 
 ## Related References
 
-- [`ref-validation.md`](./ref-validation.md) — Validation rules (regex, range, API-based)
-- [`ref-copy-params.md`](./ref-copy-params.md) — How to reference parameter values in downstream nodes
-- [`ref-silent-loading.md`](./ref-silent-loading.md) — Auto-filling parameter values from API responses
+- [`validation.md`](./validation.md) — Validation rules (regex, range, API-based)
+- [`copy-params.md`](./copy-params.md) — How to reference parameter values in downstream nodes
+- [`silent-loading.md`](./silent-loading.md) — Auto-filling parameter values from API responses
 - [`06-post-conditions.md`](./06-post-conditions.md) — Conditional routing after parameter collection

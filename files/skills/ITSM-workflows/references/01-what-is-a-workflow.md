@@ -37,9 +37,9 @@ Each node in the graph is one of two types: a **parameter node** (collects infor
 
 ---
 
-## System Architecture
+## How Workflows Attach to the System
 
-The workflow system is built on a three-tier architecture that handles storage, discovery, and execution.
+Workflows attach to the system as external JSON definitions. The agent discovers the right workflow, loads its full definition, and attaches it to a LangGraph session for execution.
 
 ```
 User Request
@@ -47,17 +47,17 @@ User Request
      ▼
   AI Agent
      │
-     ├──► Workflow Search (Milvus Vector DB + Azure OpenAI Embeddings)
-     │         │
-     │         └──► Returns matching workflow names & descriptions
+     ▼
+Search matching workflows
      │
-     ├──► Workflow Initialization (MongoDB → LangGraph Session)
-     │         │
-     │         └──► Loads full workflow JSON, starts execution
+     ▼
+Load selected workflow JSON
      │
-     └──► Iterative Execution
-               │
-               └──► Collect params → Submit info → API calls → Repeat → Complete
+     ▼
+Attach to LangGraph session
+     │
+     ▼
+Execute steps until complete
 ```
 
 ### Storage Layer
@@ -67,21 +67,15 @@ User Request
 | **MongoDB** | Stores the complete workflow JSON definitions (all nodes, edges, configurations) |
 | **Milvus Vector DB** | Stores vector embeddings of each workflow's `training_text` for semantic search |
 
-### Discovery
+### How the System Works
 
-When a user makes a request:
-1. The agent calls the **"Search for Available Operations"** tool with a context-rich query.
-2. The query is converted to a vector using **Azure OpenAI's `text-embedding-3-large`** model.
-3. A semantic similarity search in Milvus returns the top matching workflow IDs.
-4. Workflow names and descriptions are fetched from MongoDB and returned to the agent.
-5. The agent selects the most appropriate workflow.
-
-### Initialization
-
-1. The agent calls **"Initialize Operation"** with the chosen workflow name.
-2. The full workflow JSON is fetched from MongoDB.
-3. The workflow is loaded into a **LangGraph session** as the active workflow state.
-4. The engine begins execution from the `current_step`.
+1. The agent receives a user request and calls **"Search for Available Operations"** with a context-rich query.
+2. Azure OpenAI's `text-embedding-3-large` model converts the query into a vector.
+3. Milvus searches workflow embeddings and returns the closest matching workflow IDs.
+4. MongoDB provides the matching workflow names and descriptions so the agent can choose the best operation.
+5. The agent calls **"Initialize Operation"** with the selected workflow name.
+6. MongoDB returns the full workflow JSON, and the workflow is loaded into a **LangGraph session** as active execution state.
+7. The engine starts from `current_step` and continues through parameter collection, API calls, loops, and completion.
 
 ---
 
@@ -147,3 +141,26 @@ During execution, the agent and workflow exchange structured messages:
 | `parameter_value` | Submit user-provided input to the workflow |
 | `initiate_workflow` | Start a new workflow |
 | `cancel_workflow` | Abort the current workflow |
+
+---
+
+## Workflow JSON at a Glance
+
+A workflow is stored as one JSON document in MongoDB. At the top level, it contains metadata that helps the agent discover and control the workflow, plus a `steps` object that defines the executable graph.
+
+The core structure includes:
+
+| Field | Purpose |
+|---|---|
+| `workflow_id` | Unique identifier that links the MongoDB record with its Milvus vector record |
+| `workflow_name` | Human-readable operation name used by the agent during initialization |
+| `workflow_description` | Short explanation of what the workflow does |
+| `training_text` | Search text embedded into Milvus for semantic discovery |
+| `executed_steps` | Runtime history of nodes already completed |
+| `current_step` | The node the engine should execute next |
+| `is_workflow_ended` | Flag that stops execution when the workflow is complete |
+| `steps` | Map of all workflow nodes and transitions |
+
+The `steps` object contains the actual process graph. Each step is usually a **parameter node** that collects user input or an **API call node** that performs a backend operation. Special constructs like `__SOFT_STORAGE__` and `<--|end-of-flow|-->` help manage shared state and workflow termination.
+
+> For the full workflow JSON reference, see [`02-workflow-json-structure.md`](./02-workflow-json-structure.md).

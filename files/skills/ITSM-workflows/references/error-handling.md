@@ -1,4 +1,4 @@
-# Reference: Error Handling Quick Reference
+# Error Handling Quick Reference
 
 This document is a concise reference card for error codes, routing decisions, and error-handling patterns. For the full conceptual guide, see [`07-error-handling.md`](./07-error-handling.md).
 
