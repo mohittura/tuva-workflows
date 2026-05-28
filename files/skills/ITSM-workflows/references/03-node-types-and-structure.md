@@ -1,23 +1,29 @@
 # Node Types & Structure
 
-All executable logic in a workflow lives inside nodes. Each node is an entry in the `steps` object of the workflow JSON and represents a single unit of work — either collecting information from a user or performing an operation against a backend system.
+All executable logic in a workflow lives inside nodes. The behaviour of the nodes, and how they are connected in the workflow is governs the workflows as a whole.
+The node can either contains the detailed instructions of what kind of parameters to collect from the user or what action to make using the API call that can either execute some operations or fetches the information. There are 2 special constructs , one for caching ( `__SOFT_STORAGE__` ) and other for terminating the workflow ( `<--|end-of-flow|-->` ).
 
 ---
 
-## Common Node Properties
+## Common Node Properties that exist in all nodes:
 
-Every node, regardless of type, shares the following base properties:
+1. `type`
+2. `default_step`
+3. `post_conditions`
+4. `silent_loading`
 
-### `type`
+Below is the detailed description of all the common node properties:
+
+#### 1. `type`
 
 - **Type:** String Literal
 - **Required:** Yes
 - **Values:** `"parameter"` or `"api_call"`
-- **Purpose:** Determines the fundamental behavior of the node. The workflow engine reads this field first to decide how to process the node.
+- **Purpose:** Determines the fundamental behavior of the node. The workflow engine reads this field first to decide how to process the node. The node type 'parameter' will signal the agent to collect the detailed information from the user, where as the node type 'api_call' will signal the agent to make an API call to a backend system.
 
 ---
 
-### `default_step`
+#### 2. `default_step`
 
 - **Type:** String
 - **Required:** Yes
@@ -26,7 +32,7 @@ Every node, regardless of type, shares the following base properties:
 
 ---
 
-### `post_conditions`
+#### 3. `post_conditions`
 
 - **Type:** Array of Objects
 - **Required:** No
@@ -36,6 +42,15 @@ Every node, regardless of type, shares the following base properties:
 > For the full post-condition structure and all supported operators and functions, see [`06-post-conditions.md`](./06-post-conditions.md).
 
 ---
+
+#### 4. `silent_loading`
+
+- **Type:** Array of Objects
+- **Required:** No
+- **Purpose:** Silently loads the value of a parameter from the previous node's response or from the soft storage in case if it exists in a parameter typed node. If it exists in the api_call typed node, it will populate the `prefill_param` object, used for the api call. 
+
+> For the full silent_loading structure and all examples, see [`silent-loading.md`](./silent-loading.md).
+
 
 ## Special System Constructs
 
@@ -62,7 +77,7 @@ These are not regular node types but built-in constructs the engine recognizes.
 
 ### `<--|end-of-flow|-->`
 
-This is a **terminal marker**, not an actual node. It signals to the workflow engine that execution should stop and the workflow should be marked as complete (`is_workflow_ended = true`).
+This is a **terminal marker**, not an actual node. It doesn't exist as a key in the `steps` object like other nodes including `__SOFT_STORAGE__`. It signals to the workflow engine that execution should stop and the workflow should be marked as complete (`is_workflow_ended = true`).
 
 **Usage:**
 - Set as the `default_step` of the final node in a workflow.
@@ -80,12 +95,12 @@ This is a **terminal marker**, not an actual node. It signals to the workflow en
 
 ## Node Types At a Glance
 
-| Node Type | `type` Value | Primary Role | Key Properties |
-|---|---|---|---|
-| Parameter Node | `"parameter"` | Collect and validate user input | `params`, `post_conditions`, `default_step` |
-| API Call Node | `"api_call"` | Execute backend HTTP requests | `api_endpoint`, `copy_params`, `on_error`, `default_step` |
-| Soft Storage *(special)* | `"parameter"` | Cross-workflow session cache | `params` (empty initially, auto-managed) |
-| End of Flow *(terminal marker)* | — | Terminate the workflow | Used as a step reference, not a node itself |
+| Node Type | `type` Value | Primary Role | Key Properties | When to use |
+|---|---|---|---|---|
+| Parameter Node | `"parameter"` | Collect and validate user input | `params`, `post_conditions`, `default_step` | To collect input parameters from the user |
+| API Call Node | `"api_call"` | Execute backend HTTP requests | `api_endpoint`, `copy_params`, `on_error`, `default_step` | To execute backend HTTP requests |
+| Soft Storage *(special)* | `"parameter"` | Cross-workflow session cache | `params` (empty initially, auto-managed) | To cache data across workflows |
+| End of Flow *(terminal marker)* | — | Terminate the workflow | Used as a step reference, not a node itself | To terminate the workflow |
 
 ---
 
@@ -94,13 +109,7 @@ This is a **terminal marker**, not an actual node. It signals to the workflow en
 Each node type has its own dedicated document covering the full property specification, structure examples, and design guidance:
 
 - **Parameter Nodes** → [`04-parameter-node.md`](./04-parameter-node.md)
-  Covers: `params`, `value`, `llm_key`, `datatype`, `description`, `validation`, `available_options`, `is_optional`, `retry_count`
+  Covers all the different keys required to define the type, the usage, the need, the default values, the validation logic of a specific parameter including the retry logic, or the routing conditions for the next node based on the validation or the values of the collected parameter.
 
 - **API Call Nodes** → [`05-api-call-node.md`](./05-api-call-node.md)
-  Covers: `api_endpoint`, `prefill_params`, `copy_params`, `response`, `on_error`, `is_silent_step`, `soft_storage_params`, `retry_count`, `set_available_options`, `silent_loading`
-
-- **Copy Parameters** (used by both node types) → [`copy-params.md`](./copy-params.md)
-
-- **Validation** (used by parameter nodes and API call validation) → [`validation.md`](./validation.md)
-
-- **Silent Loading** (used to auto-fill values from API responses) → [`silent-loading.md`](./silent-loading.md)
+  Covers all the different keys required to define the API endpoint, values to include in the api call from prevoiusly executed steps, and the routing conditions of the next node using the response received from the api call.

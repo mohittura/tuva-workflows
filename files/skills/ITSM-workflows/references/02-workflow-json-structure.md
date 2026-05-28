@@ -1,12 +1,27 @@
 # Workflow JSON Structure
 
-A workflow is stored as a single JSON document in MongoDB. This document contains two sections: the **core metadata** (top-level fields that describe and control the workflow) and the **steps object** (the graph of nodes that define the actual process).
+A workflow is stored as a single JSON document in the database. This document contains two sections: the **core metadata** (top-level fields that describe and control the workflow) and the **steps object** (the graph of nodes that define the actual process).
 
 ---
 
 ## Core Metadata Fields
 
-### `workflow_id`
+Each workflow MUST have these metadata fields, using which the workflow remains the unique in the system, helps the agent to find the correct workflow and manage the workflow's lifecycle:
+
+1. `workflow_id`
+2. `workflow_name`
+3. `workflow_description`
+4. `training_text`
+5. `executed_steps`
+6. `current_step`
+7. `is_workflow_ended`
+8. `steps`
+
+---
+
+## Detailed understanding of metadata fields
+
+### 1. `workflow_id`
 
 - **Type:** String
 - **Required:** Yes
@@ -16,7 +31,7 @@ A workflow is stored as a single JSON document in MongoDB. This document contain
 
 ---
 
-### `workflow_name`
+### 2. `workflow_name`
 
 - **Type:** String
 - **Required:** Yes
@@ -26,7 +41,7 @@ A workflow is stored as a single JSON document in MongoDB. This document contain
 
 ---
 
-### `workflow_description`
+### 3. `workflow_description`
 
 - **Type:** String
 - **Required:** Yes
@@ -36,11 +51,11 @@ A workflow is stored as a single JSON document in MongoDB. This document contain
 
 ---
 
-### `training_text`
+### 4. `training_text`
 
 - **Type:** String
 - **Required:** Yes
-- **Purpose:** The text corpus vectorized and stored in Milvus for semantic search. This is what the discovery system matches against when a user makes a request.
+- **Purpose:** The training_text is used to create the embeddings for the workflow, using which the agent finds the most relevant workflow from the vector database.
 - **Content Strategy:**
   - Include natural language phrasings a user might say to trigger this workflow.
   - Cover synonyms, related phrases, and common misspellings.
@@ -49,32 +64,32 @@ A workflow is stored as a single JSON document in MongoDB. This document contain
 
 ---
 
-### `executed_steps`
+### 5. `executed_steps`
 
 - **Type:** Array of Strings
 - **Required:** Yes
 - **Default:** `[]`
-- **Purpose:** Tracks which nodes have already been executed in the current workflow instance. Managed automatically by the workflow engine.
+- **Purpose:** Tracks which nodes have already been executed in the current workflow instance. Managed automatically by the workflow engine. Initialized as empty.
 - **Engine Behavior:** When a node completes, its name is appended to this array. This prevents replaying completed steps and provides an audit trail of the execution path.
 
 ---
 
-### `current_step`
+### 6. `current_step`
 
 - **Type:** String
 - **Required:** Yes
 - **Purpose:** Points to the node that the workflow engine should execute next. Updated automatically after each step completes.
-- **Initial Value:** Typically `"__SOFT_STORAGE__"` (the system's global data cache node) or the name of whichever node should run first.
+- **Initial Value:** Typically `"__SOFT_STORAGE__"` (the system's global data cache node) or the name of whichever node should run first. The value of this key will always be there in the `steps` object.
 - **Engine Behavior:** After a node executes, the engine evaluates post-conditions and the `default_step` to set the new value.
 
 ---
 
-### `is_workflow_ended`
+### 7. `is_workflow_ended`
 
 - **Type:** Boolean
 - **Required:** Yes
 - **Default:** `false`
-- **Purpose:** Terminal flag. When `true`, the engine stops processing and considers the workflow complete. No further nodes are executed.
+- **Purpose:** Terminal flag. When `true`, the engine stops processing and considers the workflow complete. No further nodes are executed. Only the workflow engine can change the value of this flag.
 - **Set to `true` when:**
   - A node's `default_step` or post-condition `true_step` points to `"<--|end-of-flow|-->"`.
   - The maximum retry count for a node is exceeded.
@@ -82,7 +97,7 @@ A workflow is stored as a single JSON document in MongoDB. This document contain
 
 ---
 
-### `steps`
+### 8. `steps`
 
 - **Type:** Object (key-value map)
 - **Required:** Yes
@@ -125,19 +140,17 @@ The node names are referenced throughout the workflow — in `current_step`, `ex
 
 The `steps` object is composed of nodes, each of which belongs to one of two fundamental types:
 
-| Type | Key | Purpose |
+| Type | Key | Purpose | Reference |
+|---|---|---|---|
+| **Parameter Node** | `"type": "parameter"` | Collects, validates, and stores user-provided input | [`04-parameter-node.md`](./04-parameter-node.md) |
+| **API Call Node** | `"type": "api_call"` | Executes an HTTP request to a backend system | [`05-api-call-node.md`](./05-api-call-node.md) |
+
+In addition, two **special constructs** exist that are not node types but impacts the execution flow:
+
+| Construct | Purpose | Usage |
 |---|---|---|
-| **Parameter Node** | `"type": "parameter"` | Collects, validates, and stores user-provided input |
-| **API Call Node** | `"type": "api_call"` | Executes an HTTP request to a backend system |
+| `__SOFT_STORAGE__` | A special parameter node that acts as a global cross-workflow data cache. It can be used to store and retrieve data across different workflows. | It is a parameter type node, because it holds the values cached during the execution of the workflow. Note that the name will always be `__SOFT_STORAGE__` and it will always be the first node in the `steps` object. |
+| `<--\|end-of-flow\|-->` | A terminal marker — not a real node, but used as a `default_step` or `true_step` value to end the workflow execution | It's a terminal marker, therefor, the workflow engine uses this value to determine that the workflow has ended, but there won't be a dedicated step for it in the `steps` object like `__SOFT_STORAGE__`.  |
 
-In addition, two **special constructs** exist that are not node types but control execution flow:
 
-| Construct | Purpose |
-|---|---|
-| `__SOFT_STORAGE__` | A special parameter node that acts as a global cross-workflow data cache |
-| `<--|end-of-flow|-->` | A terminal marker — not a real node, but used as a `default_step` or `true_step` value to end the workflow |
-
-> For the full structure and properties of each node type, see:
-> - [`03-node-types-and-structure.md`](./03-node-types-and-structure.md) — common node properties and special constructs
-> - [`04-parameter-node.md`](./04-parameter-node.md) — parameter node reference
-> - [`05-api-call-node.md`](./05-api-call-node.md) — API call node reference
+**Note:** Though parameter and api_call nodes have different purposes, they share some common keys/sub-structure that must exist in any node. For more details about the common keys/sub-structure, see [`03-node-types-and-structure.md`](./03-node-types-and-structure.md). It also contains the detailed understanding of the special nodes `__SOFT_STORAGE__` and `<--|end-of-flow|-->`. 

@@ -1,14 +1,11 @@
 ---
 name: ITSM-workflows
-description: "Generates, validates, and debugs ITSM workflow JSON definitions that drive agent behavior and execution in the Tuva ITSM system. Use when the task involves creating a new workflow from a Workflow Requirement Specification (WRS) document, editing an existing workflow JSON, reviewing a workflow for correctness, debugging workflow execution issues, or understanding workflow schema components such as nodes, post-conditions, soft storage, copy_params, silent_loading, or error handling."
-
+description: Contains the detailed understanding of all the components of the ITSM workflow JSON structure which must be used when the task involves creating new workflows, updating, editing, or debugging the existing workflows.
 ---
 
-# ITSM Workflow Generation
+# ITSM Workflow JSON Structure
 
-This skill produces valid workflow JSON definitions from a Workflow Requirement Specification (WRS) document. Workflows are directed cyclic graphs of nodes that an AI agent discovers, initializes, and drives to completion. The JSON defines *what* the agent does — parameter collection, API calls, conditional routing, error handling — while the agent handles conversation and decision-making.
-
-Every workflow is stored in MongoDB and discovered via semantic search against its `training_text` in Milvus. The engine loops: execute `current_step` → evaluate `post_conditions` → move to `default_step` or `true_step` → repeat until `<--|end-of-flow|-->`.
+This skill enables the agent to understand the complex JSON structure of the ITSM workflows. ITSM workflows are defined as JSON objects with specific fields and nested structures that dictate how the workflow operates. This document provides a comprehensive reference to the key components of the workflow JSON, including special nodes like `__SOFT_STORAGE__` and terminal markers like `<--|end-of-flow|-->`, as well as an overview of node types and their properties. The JSON defines *what* the agent does — parameter collection, API calls, conditional routing, error handling — while the agent handles conversation and decision-making.
 
 ---
 
