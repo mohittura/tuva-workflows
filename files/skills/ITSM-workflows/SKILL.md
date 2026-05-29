@@ -13,8 +13,8 @@ This skill enables the agent to understand the complex JSON structure of the ITS
 
 Before generating or modifying any workflow, read these two documents in full:
 
-1. **`references/08-best-practices.md`** — Design principles, naming conventions, validation strategy, performance rules.
-2. **`references/01-what-is-a-workflow.md`** — System architecture, execution loop, agent-workflow communication, state model.
+1. **`[references/08-best-practices.md](./references/08-best-practices.md)`** — Design principles, naming conventions, validation strategy, performance rules.
+2. **`[references/01-what-is-a-workflow.md](./references/01-what-is-a-workflow.md)`** — System architecture, execution loop, agent-workflow communication, state model.
 
 These are non-negotiable. Skip them and the workflow will have structural or behavioral defects.
 
@@ -24,19 +24,20 @@ These are non-negotiable. Skip them and the workflow will have structural or beh
 
 | Document | Purpose | When to Use |
 |----------|---------|-------------|
-| `references/01-what-is-a-workflow.md` | System architecture, execution loop, discovery model | **Always** — read before starting any workflow task |
-| `references/02-workflow-json-structure.md` | Top-level metadata fields and `steps` object schema | When writing the workflow skeleton and metadata |
-| `references/03-node-types-and-structure.md` | Common node properties, `__SOFT_STORAGE__`, `<--|end-of-flow|-->` | When designing the node graph and special constructs |
-| `references/04-parameter-node.md` | Parameter definition: `value`, `llm_key`, `datatype`, `validation`, `available_options`, `is_optional`, `retry_count` | When building any parameter collection node |
-| `references/05-api-call-node.md` | API call structure: `api_endpoint`, `prefill_params`, `copy_params`, `on_error`, `is_silent_step`, `soft_storage_params`, `set_available_options` | When building any API call node |
-| `references/06-post-conditions.md` | Conditional branching: `logical_operator`, `conditions`, `true_step`, operators, functions | When adding conditional routing to any node |
-| `references/07-error-handling.md` | Error codes, propagation model, `on_error` vs `post_conditions`, retry logic | When designing error paths and resilience |
-| `references/08-best-practices.md` | Design principles, naming, validation strategy, performance | **Always** — read before starting any workflow task |
-| `references/copy-params.md` | Passing data between nodes via `copy_params` | When wiring data flow between parameter and API nodes |
-| `references/validation.md` | Local validation (regex, range, len) and remote API validation | When adding input validation to parameters |
-| `references/silent-loading.md` | Auto-filling parameter values from prior API responses | When a parameter value can be inferred from a prior API call |
-| `references/error-handling.md` | Quick reference card for error codes and routing decisions | When configuring `on_error` mappings |
-
+| `[references/01-what-is-a-workflow.md](./references/01-what-is-a-workflow.md)` | System architecture, execution loop, discovery model | **Always** — read before starting any workflow task |
+| `[references/02-workflow-json-structure.md](./references/02-workflow-json-structure.md)` | Top-level metadata fields and `steps` object schema | When writing the workflow skeleton and metadata |
+| `[references/03-node-types-and-structure.md](./references/03-node-types-and-structure.md)` | Common node properties, `__SOFT_STORAGE__`, `<--|end-of-flow|-->` | When designing the node graph and special constructs |
+| `[references/04-parameter-node.md](./references/04-parameter-node.md)` | Parameter definition: `value`, `llm_key`, `datatype`, `validation`, `available_options`, `is_optional`, `retry_count` | When building any parameter collection node |
+| `[references/05-api-call-node.md](./references/05-api-call-node.md)` | API call structure: `api_endpoint`, `prefill_params`, `copy_params`, `on_error`, `is_silent_step`, `soft_storage_params`, `set_available_options` | When building any API call node |
+| `[references/06-post-conditions.md](./references/06-post-conditions.md)` | Conditional branching: `logical_operator`, `conditions`, `true_step`, operators, functions | When adding conditional routing to any node |
+| `[references/07-error-handling.md](./references/07-error-handling.md)` | Error codes, propagation model, `on_error` vs `post_conditions`, retry logic | When designing error paths and resilience |
+| `[references/08-best-practices.md](./references/08-best-practices.md)` | Design principles, naming, validation strategy, performance | **Always** — read before starting any workflow task |
+| `[references/copy-params.md](./references/copy-params.md)` | Passing data between nodes via `copy_params` | When wiring data flow between parameter and API nodes |
+| `[references/validation.md](./references/parameter-validation.md)` | Local validation (regex, range, len) and remote API validation | When adding input validation to parameters |
+| `[references/silent-loading.md](./references/silent-loading.md)` | Auto-filling parameter values from prior API responses | When a parameter value can be inferred from a prior API call |
+| `[references/error-handling-quick-reference.md](./references/error-handling-quick-reference.md)` | Quick reference card for error codes and routing decisions | When configuring `on_error` mappings |
+| `[references/interrupt-nodes.md](./references/interrupt-nodes.md)` | Interrupt nodes | When a workflow requires a pause |
+| `[references/soft-storage-params.md](./references/soft-storage-params.md)` | Passing data between nodes via `soft_storage_params` | When wiring data flow between parameter and API nodes |
 ---
 
 ## Workflow Creation Lifecycle

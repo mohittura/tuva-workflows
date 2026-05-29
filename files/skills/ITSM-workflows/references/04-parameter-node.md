@@ -83,7 +83,7 @@ The `params` field is a key-value map. Each key is the internal identifier for a
 
 A single parameter node can collect multiple related fields at once. Group fields that logically belong together in one node, and separate fields that belong to different stages of the process into different nodes.
 
-> **Example:**
+**Example:**
 ```json
 "collect_requester_info": {
   "type": "parameter",
@@ -92,8 +92,8 @@ A single parameter node can collect multiple related fields at once. Group field
     "department": { ... parameter object of "department" key},
     "contact_number": { ... parameter object of "contact_number" key}
   },
-  "silent_loading": [ ...], //only when needed else dont use this
-  "post_conditions": [ ], //only when needed else dont use this
+  "silent_loading": [...], //only when needed else dont use this
+  "post_conditions": [], //only when needed else dont use this
   "default_step": "next_node_name" //only when needed else dont use this
 }
 ```
@@ -166,7 +166,7 @@ A single parameter node can collect multiple related fields at once. Group field
 - **Required:** No
 - **Purpose:** Defines one or more rules that the user's input must satisfy before the value is accepted. Supports both local rule-based validation and remote API-based validation. When there is no validation for a parameter, it is must to set it as an empty object.
 
-  > For the full validation specification, supported functions, operators, and API validation structure, see [`validation.md`](./validation.md).
+  > For the full validation specification, supported functions, operators, and API validation structure, see [`parameter-validation.md`](./parameter-validation.md).
 
 ---
 
@@ -220,6 +220,6 @@ A single parameter node can collect multiple related fields at once. Group field
 
 ## Related References
 
-- [`validation.md`](./validation.md) — Contains different kind of validations supported by the workflow engine like regex, range, API-based.
-- [`silent-loading.md`](./silent-loading.md) — Contains different usecases and how-to of Auto-filling parameter values from API responses
+- [`parameter-validation.md`](./parameter-validation.md) — Contains different kind of validations supported by the workflow engine like regex, range, API-based. Also covers how to handle validation failures.
+- [`silent-loading.md`](./silent-loading.md) — Contains different usecases and how-to use  auto-filling parameter values from API responses
 - [`06-post-conditions.md`](./06-post-conditions.md) — Conditional routing after parameter collection

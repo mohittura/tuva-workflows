@@ -31,21 +31,53 @@ An API call node is the action component of a workflow. While parameter nodes co
   "default_step": "next_node_name"
 }
 ```
+## Example
+[Example of API Call Node](../examples/create_zendesk_tickets.json)
+
+```json
+"send_email_otp": {
+      "type": "api_call",
+      "inputs": {},
+      "response": {},
+      "api_endpoint": "send-otp",
+      "prefill_params": {},
+      "copy_params": [
+        {
+          "keys": [
+            {
+              "copy_from": "user_email",
+              "copy_to": "email"
+            }
+          ],
+          "step": "collect_user_name_|_email"
+        }
+      ],
+      "default_step": "collect_otp"
+    }
+```
+
+  Here, `send_email_otp` is defined as an `api_call` node that triggers an external API operation to send a one-time password (OTP):
+  * **`api_endpoint`**: Specifies the endpoint `send-otp` to indicate which API endpoint is to be invoked.
+  * **`copy_params`**: This copies the collected value of `user_email` from the previous step (`collect_user_name_|_email`) and maps it to the `email` key in the request payload for this API call.
+  * **`default_step`**: Once the API call executes successfully, the workflow engine automatically transitions to the `collect_otp` node.
+
+  **Note** This is just a specific example to illustrate the node structure. Configurations are subject to change based on the workflow requirements; different API steps will define endpoints, copy parameters, error handling, or option setting differently depending on the specific design of the flow and requirement of the workflow.
 
 ---
 
 ## Properties
 
-### `api_endpoint`
+#### 1. `api_endpoint`
 
 - **Type:** String
 - **Required:** Yes
 - **Purpose:** The path of the API endpoint to call. The base URL is configured at the system level — this field contains only the relative path.
-- **Examples:** `"tickets/create"`, `"users/search"`, `"auth/validate"`, `"hr/departments"`
+- The endpoints will be provided by the user in the WRS (Workflow Request Specification). The user can define multiple endpoints and can specify the name of the endpoint in the node that he wants to use.
+- if the endpoints are not specified by the user, then ask the user about the endpoints to be used.
 
 ---
 
-### `prefill_params`
+#### 2. `prefill_params`
 
 - **Type:** Object
 - **Required:** No
@@ -61,7 +93,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `copy_params`
+#### 3. `copy_params`
 
 - **Type:** Array of Objects
 - **Required:** No
@@ -71,7 +103,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `response`
+#### 4. `response`
 
 - **Type:** Object
 - **Required:** Yes (always start as `{}`)
@@ -82,7 +114,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `on_error`
+#### 5. `on_error`
 
 - **Type:** Object
 - **Required:** No (but strongly recommended)
@@ -101,7 +133,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `is_silent_step`
+#### 6. `is_silent_step`
 
 - **Type:** Object (error code → boolean)
 - **Required:** No
@@ -125,7 +157,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `soft_storage_params`
+#### 7. `soft_storage_params`
 
 - **Type:** Array of Objects
 - **Required:** No
@@ -153,7 +185,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `silent_loading`
+#### 8. `silent_loading`
 
 - **Type:** Array of Objects
 - **Required:** No
@@ -163,7 +195,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `retry_count`
+#### 9. `retry_count`
 
 - **Type:** Integer
 - **Required:** No
@@ -173,7 +205,7 @@ An API call node is the action component of a workflow. While parameter nodes co
 
 ---
 
-### `set_available_options`
+#### 10. `set_available_options`
 
 - **Type:** Array of Objects
 - **Required:** No
@@ -194,11 +226,29 @@ An API call node is the action component of a workflow. While parameter nodes co
   - `set_step` — the name of the parameter node that contains the target parameter
 
 ---
+#### 11. `default_step`
+
+- **Type:** String
+- **Required:** Yes
+- **Purpose:** Specifies the next node to execute when no post-condition evaluates to `true`. Think of this as the "else" branch — the fallback path when no conditional routing applies.
+- **Values:** Any other node name in the `steps` object, or `"<--|end-of-flow|-->"` to terminate the workflow.
+
+---
+
+#### 12. `post_conditions`
+
+- **Type:** Array of Objects
+- **Required:** No
+- **Purpose:** Defines conditional branching logic evaluated after the node executes. If a condition matches, the workflow routes to the `true_step` rather than the `default_step`.
+- **Evaluation Order:** Conditions are checked in array order. The first one that evaluates to `true` wins.
+
+  > For the full post-condition structure and all supported operators and functions, see [`06-post-conditions.md`](./06-post-conditions.md).
+
+---
 
 ## Related References
 
-- [`copy-params.md`](./copy-params.md) — To populate the request payload of the `api_call` nodes using the parameter values collected from the user or the response of the previous api calls.
-<!-- - [`validation.md`](./validation.md) — Using API calls for remote validation inside parameter nodes -->
-- [`silent-loading.md`](./silent-loading.md) — Auto-filling `prefill_params` from prior API responses
-- [`07-error-handling.md`](./07-error-handling.md) — Error codes, `on_error` routing, and propagation model
-- [`06-post-conditions.md`](./06-post-conditions.md) — Conditional routing after API call completion
+- [`copy-params.md`](./copy-params.md) — Explains how to map and populate the request payload of the current API call using the gathered user inputs or prior API responses.
+- [`silent-loading.md`](./silent-loading.md) — Covers the mechanisms for silently pre-filling API parameters using data collected in previous steps automatically.
+- [`07-error-handling.md`](./07-error-handling.md) — Covers how to handle API call failures, to configure custom error paths (`on_error`), and interpret system error codes.
+- [`06-post-conditions.md`](./06-post-conditions.md) — Covers routing rules and conditions to dynamically decide the next workflow step based on the API response.

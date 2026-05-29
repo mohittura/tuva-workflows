@@ -253,6 +253,6 @@ A parameter can have **only one** `validation` object. It is not currently possi
 ## Related Documents
 
 - [`04-parameter-node.md`](./04-parameter-node.md) — Parameter node structure
-- [`ref-copy-params.md`](./ref-copy-params.md) — `copy_params` inside validation API calls
+- [`copy-params.md`](./copy-params.md) — `copy_params` inside validation API calls
 - [`07-error-handling.md`](./07-error-handling.md) — Error handling when validation fails
 - [`06-post-conditions.md`](./06-post-conditions.md) — Routing based on validation outcomes

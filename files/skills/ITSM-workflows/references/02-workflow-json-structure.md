@@ -103,15 +103,29 @@ Each workflow MUST have these metadata fields, using which the workflow remains 
 - **Required:** Yes
 - **Purpose:** Contains every node in the workflow graph. Each key is a unique node name; each value is a node definition object.
 
-```json
-"steps": {
-  "node_name_1": { /* node definition */ },
-  "node_name_2": { /* node definition */ },
-  "node_name_3": { /* node definition */ }
-}
-```
+  [Example chunk of the steps object in a real workflow](../examples/create_zendesk_tickets.json#L12-L49)
+  The step name is always a key in the steps object and value will be the node definition object.
+  In other words, the step name is the identifier of the node. and it will always be there in the `steps` object.
 
-The node names are referenced throughout the workflow — in `current_step`, `executed_steps`, `default_step`, `true_step`, and `copy_params` — so they must be stable and descriptive.
+  Example: 
+  ```json
+  "steps": {
+    "__SOFT_STORAGE__": { ... }, //node 1
+    "collect_user_name_|_email": { ... }, //node 2
+    "send_email_otp": { ... }, //node 3
+    "validate_otp": { ... }, //node 4
+    "get_ticket_type_|_priority": { ... }, //node 5
+    "collect_subject_|_comment_|_group_name_|_priority_|_type": { ... }, //node 6
+    "create_ticket_api": { ... } //node 7
+  }
+  ```
+  All the node names inside the steps are unique and cannot be repeated. However, they are human readable and easy to understand for the agent.
+  The internal steps inside the nodes will be differed based on the buisness logic needs defined in the user given WRS document. In each node there can be multiple steps involved. These `steps` types can be either:
+  - Parameter nodes
+  - API call nodes
+  - Interrupt nodes (Interrupt nodes are special kind of nodes which are used to terminate the workflow. they are very rare and only to be used when specified in the WRS document. for more details, see [Interrupt Nodes](./interrupt-nodes.md))
+
+  The node names are referenced throughout the workflow — in `current_step`, `executed_steps`, `default_step`, `true_step`, and `copy_params` — so they must be stable and descriptive.
 
 ---
 

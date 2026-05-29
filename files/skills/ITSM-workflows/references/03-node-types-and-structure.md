@@ -73,6 +73,38 @@ These are not regular node types but built-in constructs the engine recognizes.
 - Auth tokens retrieved during a login workflow are stored here and reused by all subsequent workflows.
 - User email or department fetched once and reused across multiple ticket creation flows.
 
+**Example:**
+[Chunk showing the soft storage node in create_zendesk_tickets.json](../examples/create_zendesk_tickets.json#L12-L29)
+```json
+"__SOFT_STORAGE__": {
+      "type": "parameter",
+      "params": {},
+      "post_conditions": [
+        {
+          "logical_operator": "",
+          "conditions": [
+            {
+              "key": "is_user_authenticated",
+              "step": "__SOFT_STORAGE__",
+              "criteria": true,
+              "operator": "=="
+            }
+          ],
+          "true_step": "verify_user_role"
+        }
+      ],
+      "default_step": "collect_user_name_|_email"
+    }
+```
+  Here, The `__SOFT_STORAGE__` is defined as a parameter node at the entry point of the workflow to cache the required information which is required throughout the workflow.
+  * **Empty `params` (`{}`)**: The `params` object is empty, indicating that this node does not need to collect any information directly from the user at this step.
+  * **Evaluating Session State**: The `post_condition` checks the session-scoped cache (`step: "__SOFT_STORAGE__"`) for the presence and value of the `is_user_authenticated` key.
+  * **Conditional Routing**:
+    * **If Authenticated (`true`)**: The workflow transitions to the `verify_user_role` node, skipping any login or credential-gathering steps.
+    * **If Unauthenticated (Fallback)**: It falls back to the `default_step` (`collect_user_name_|_email`) to prompt the user to identify themselves.
+  
+  Things are subject to change based on the requirements and different steps define things differently based on the flow. The above given example shows the basic idea of how the soft storage works.
+
 ---
 
 ### `<--|end-of-flow|-->`
@@ -83,6 +115,7 @@ This is a **terminal marker**, not an actual node. It doesn't exist as a key in 
 - Set as the `default_step` of the final node in a workflow.
 - Set as the `true_step` in a post-condition when a successful path should terminate the workflow.
 
+**Example:**
 ```json
 "submit_ticket_api": {
   "type": "api_call",

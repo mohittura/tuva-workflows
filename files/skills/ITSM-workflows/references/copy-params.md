@@ -202,5 +202,5 @@ Copy from multiple prior nodes in a single `copy_params` array:
 
 - [`04-parameter-node.md`](./04-parameter-node.md) — Parameter collection and value storage
 - [`05-api-call-node.md`](./05-api-call-node.md) — API call node and response storage
-- [`ref-validation.md`](./ref-validation.md) — `copy_params` inside validation API calls
+- [`parameter-validation.md`](./parameter-validation.md) — `copy_params` inside validation API calls
 - [`03-node-types-and-structure.md`](./03-node-types-and-structure.md) — `__SOFT_STORAGE__` reference

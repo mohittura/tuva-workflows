@@ -8,6 +8,25 @@ The workflow engine can transfer a value from one step to another using `copy_pa
 
 ---
 
+## How it is different from `copy_params`
+
+While both mechanisms are used for data flow between workflow nodes, they serve fundamentally different purposes and target different parts of the node structure:
+
+| Aspect | `copy_params` | `silent_loading` |
+|---|---|---|
+| **Primary Purpose** | **Construct API Request Payloads**: Maps values from the workflow state (parameters or prior responses) into the payload of an outgoing API call. | **Pre-fill State & Bypass Prompts**: Populates parameter values or static prefill keys from a prior response without prompting the user. |
+| **Destination** | Outgoing API request payload (`api_endpoint` call). | Parameter values (`params.<key>.value`) or node configurations (`prefill_params`). |
+| **User Prompts** | **No impact on user prompts**: Parameters must have already been collected/prompted *before* they can be copied. | **Bypasses user prompts**: If the value is loaded successfully, the user is never asked for it. |
+| **Data Sources** | Parameter values, API response fields, and `__SOFT_STORAGE__`. | Only the `response` object of a previously executed `api_call` node. |
+| **Location in JSON** | Placed inside an `api_call` node (or a parameter validation block). | Placed at the root level of the destination node (`parameter` or `api_call`). |
+
+### Key Conceptual Difference
+
+* **`copy_params` is an exporter**: It says, *"Take these values we have gathered and send them to the API endpoint we are about to call."*
+* **`silent_loading` is an importer**: It says, *"Check the results of that previous API call. If the value we need is there, load it into our parameters/prefills immediately so we don't have to ask the user for it."*
+
+---
+
 ## When to Use Silent Loading
 
 Silent loading is appropriate when:
@@ -40,7 +59,7 @@ Silent loading can be applied in three scenarios:
 
 ---
 
-## Structure
+## Complete Structure Example
 
 ```json
 "silent_loading": [
@@ -74,6 +93,7 @@ Silent loading can be applied in three scenarios:
 - **Type:** String
 - **Required:** Yes
 - **Purpose:** The name of the `api_call` node whose `response` object is the data source for this silent loading block. Must be a node that has already executed by the time this node runs.
+- **Note:** This will always be the type of `api_call` node.
 
 ---
 
@@ -133,10 +153,17 @@ source_field = "ad_user_details$department$name"
 ### Case 1: Set a parameter value
 
 ```json
-{
-  "source_field": "ad_user_details$first_name",
-  "destination_param": "first_name"
-}
+"silent_loading": [
+  {
+    "mappings": [
+      {
+        "source_field": "ad_user_details$first_name",
+        "destination_param": "first_name"
+      }
+    ],
+    "step": "fetch_ad_user_details"
+  }
+]
 ```
 
 Reads `first_name` from the `ad_user_details` object in the source step's response, and sets it as the `value` of the `first_name` parameter in the current node. The user will not be prompted for `first_name` if this succeeds.
@@ -146,11 +173,18 @@ Reads `first_name` from the `ad_user_details` object in the source step's respon
 ### Case 2: Set a parameter value AND store it in `prefill_params` under a custom key
 
 ```json
-{
-  "source_field": "ad_user_details$last_name",
-  "destination_param": "last_name",
-  "set_as": "example_last_name"
-}
+"silent_loading": [
+  {
+    "mappings": [
+      {
+        "source_field": "ad_user_details$last_name",
+        "destination_param": "last_name",
+        "set_as": "example_last_name"
+      }
+    ],
+    "step": "fetch_ad_user_details"
+  }
+]
 ```
 
 Both sets the `value` of the `last_name` parameter and also stores the same value in `prefill_params` under the key `"example_last_name"`. Useful when the same value needs to serve as both a collected parameter and a static payload field.
@@ -160,13 +194,20 @@ Both sets the `value` of the `last_name` parameter and also stores the same valu
 ### Case 3: Set a `prefill_params` value only (no parameter involved)
 
 ```json
-{
-  "source_field": "ad_user_details$last_name",
-  "set_as": "my_last_name"
-}
+"silent_loading": [
+  {
+    "mappings": [
+      {
+        "source_field": "ad_user_details$last_name",
+        "set_as": "my_last_name"
+      }
+    ],
+    "step": "fetch_ad_user_details"
+  }
+]
 ```
 
-Reads `last_name` from the source response and stores it in `prefill_params` under the key `"my_last_name"`. No parameter `value` is set — this is purely for populating the API request payload without user input.
+Reads the `last_name` from the `ad_user_details` object in the response of the `fetch_ad_user_details` step, and stores it in the current node's `prefill_params` under the key `"my_last_name"`. Since `destination_param` is not defined, no parameter `value` is set on the node; this mapping is purely used to populate the API request payload silently without prompting the user.
 
 ---
 
@@ -238,4 +279,4 @@ In this example:
 
 - [`04-parameter-node.md`](./04-parameter-node.md) — Where `silent_loading` is used in parameter nodes
 - [`05-api-call-node.md`](./05-api-call-node.md) — Where `silent_loading` is used in API call nodes
-- [`ref-copy-params.md`](./ref-copy-params.md) — The explicit (non-silent) mechanism for passing values between nodes
+- [`copy-params.md`](./copy-params.md) — The explicit (non-silent) mechanism for passing values between nodes

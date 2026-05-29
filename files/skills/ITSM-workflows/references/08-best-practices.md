@@ -14,7 +14,7 @@ Collect only the information needed at each stage of the process. Don't front-lo
 
 ### Defensive Validation
 Validate user input before sending it to backend systems. Use parameter-level `validation` rules for format checks (regex, range, length), and use `api_call` nodes for business-rule validation that requires a backend lookup.
-> See [`validation.md`](./validation.md).
+> See [`parameter-validation.md`](./parameter-validation.md).
 
 ### Graceful Degradation
 Every workflow should handle its failure cases with user-friendly responses. A workflow that can silently fail or get stuck is worse than one that clearly communicates the problem and exits cleanly.
