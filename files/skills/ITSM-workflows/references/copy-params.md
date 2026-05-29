@@ -1,19 +1,28 @@
 # Copy Parameters (`copy_params`)
 
-`copy_params` is the primary mechanism for passing data between nodes in a workflow. It maps values from the workflow's current state — whether from a collected parameter or from a prior API call's response — into the payload of an outgoing API request.
+`copy_params` is used to import parameters from previously executed steps into the request payload of the current step. They are used in `api_call` nodes as well as in the `api_call`-based validation blocks of parameter nodes. Therefore, they are fully utilized in all API execution nodes and processes.
+
+## Conceptual Model (`m * n` Mapping)
+
+The previously executed `m` steps are mapped to `n` parameters/values to populate the request payload of the current step. In total, the workflow engine can import up to `m * n` key-value pairs.
+- **`m`** represents the number of distinct source steps we are reading data from.
+- **`n`** represents the number of specific values/keys we are importing from a given source step.
+
+For example, if we have `m = 2` source steps and want to import `n = 3` values from each of them, `copy_params` will map and populate `2 * 3 = 6` key-value pairs in the outgoing request payload.
 
 ---
 
 ## Where It Is Used
 
-`copy_params` can appear in two places:
-
+`copy_params` appears in two places:
 1. **Inside an `api_call` node** — to populate the request payload of that API call with values from earlier steps.
-2. **Inside a `validation.api_call` block within a parameter node** — to populate the request payload of a validation API call with values already collected.
+2. **Inside a validation based on `api_call` for parameter** — to populate the request payload of a validation API call with values already collected.
 
 ---
 
-## Complete Structure
+## Structure
+
+The configuration format allows importing `n` values from a single step, repeated for all `m` source steps:
 
 ```json
 "copy_params": [
@@ -22,7 +31,7 @@
       {
         "copy_from": "source_field_name",
         "copy_to": "destination_field_name",
-        "source": "response"
+        "source": "response" // Only when the step is pointing to an api_call type node
       }
     ],
     "step": "source_node_name"
@@ -73,7 +82,7 @@
 
 - **Type:** String
 - **Required:** No
-- **Purpose:** Specifies which part of the source node to read from.
+- **Purpose:** Specifies which part of the source node to read from, only used when `step` points to an `api_call` type node.
 
 | Value | Reads From |
 |---|---|
@@ -85,7 +94,7 @@
 
 ## Practical Examples
 
-### Example 1: Copying a Parameter Value
+### Example 1: Importing `n = 1` Value from `m = 1` Step (Parameter Node)
 
 Copy the collected email address into the API request:
 
@@ -95,20 +104,16 @@ Copy the collected email address into the API request:
     "keys": [
       {
         "copy_from": "user_email",
-        "copy_to": "email",
-        "source": ""
+        "copy_to": "email"
       }
     ],
     "step": "collect_user_details"
   }
 ]
 ```
+Here, we read the parameter value `user_email` from the parameter node `collect_user_details` and map it to `email` in the outgoing request payload. Since the source is a parameter node, the `source` property is omitted.
 
-Here, `user_email` is a parameter key in the `collect_user_details` node. Its `.value` is copied to `email` in the outgoing request.
-
----
-
-### Example 2: Copying from an API Response
+### Example 2: Importing `n = 1` Value from `m = 1` Step (API Response)
 
 Use a field returned by a prior API call:
 
@@ -126,35 +131,11 @@ Use a field returned by a prior API call:
   }
 ]
 ```
+Here, the `ticket_id` field from the API response of `create_parent_ticket_api` is mapped to `parent_ticket_id`. Since the source is an API call, `source` is set to `"response"`.
 
-The `ticket_id` field from `create_parent_ticket_api`'s response object is copied into the new request as `parent_ticket_id`.
+### Example 3: Importing from Multiple Steps (`m = 2`, `n = 1` and `n = 2`)
 
----
-
-### Example 3: Copying from Soft Storage
-
-Reuse an authentication token stored in `__SOFT_STORAGE__` from a prior session workflow:
-
-```json
-"copy_params": [
-  {
-    "keys": [
-      {
-        "copy_from": "user_auth_token",
-        "copy_to": "auth_token",
-        "source": ""
-      }
-    ],
-    "step": "__SOFT_STORAGE__"
-  }
-]
-```
-
----
-
-### Example 4: Multiple Sources in One Node
-
-Copy from multiple prior nodes in a single `copy_params` array:
+Importing from multiple steps in a single `copy_params` array:
 
 ```json
 "copy_params": [
@@ -162,8 +143,7 @@ Copy from multiple prior nodes in a single `copy_params` array:
     "keys": [
       {
         "copy_from": "user_email",
-        "copy_to": "requester_email",
-        "source": ""
+        "copy_to": "requester_email"
       }
     ],
     "step": "collect_user_details"
@@ -172,29 +152,28 @@ Copy from multiple prior nodes in a single `copy_params` array:
     "keys": [
       {
         "copy_from": "ticket_priority",
-        "copy_to": "priority",
-        "source": ""
+        "copy_to": "priority"
       },
       {
         "copy_from": "issue_description",
-        "copy_to": "description",
-        "source": ""
+        "copy_to": "description"
       }
     ],
     "step": "collect_issue_info"
   }
 ]
 ```
+In this configuration, we import:
+1. `n = 1` parameter value (`user_email`) from the first step `collect_user_details`.
+2. `n = 2` parameter values (`ticket_priority`, `issue_description`) from the second step `collect_issue_info`.
+In total, `3` key-value pairs are imported.
 
 ---
 
 ## Key Rules
-
-- Each object in `copy_params` references **one source node** (`step`), but can map **multiple fields** from it (`keys`).
-- Multiple objects in the array allow copying from **multiple source nodes** in one go.
-- The `copy_to` key name must match what the backend API expects in its request body.
-- `source: "response"` is only valid for `api_call` type nodes. Applying it to a parameter node will fail.
-- When reading from `__SOFT_STORAGE__`, the `copy_from` value must match the `set_to` key used when the data was stored via `soft_storage_params`.
+- **Mapping Array Size**: Each object inside `copy_params` represents a single source step. If you need to import values from multiple steps, declare multiple mapping objects in the `copy_params` array.
+- **Node Type Rule**: Always verify the type of the source `step`. If it is an `api_call` node, `"source": "response"` is required. If it is a `parameter` node or `__SOFT_STORAGE__`, the `source` field must be omitted.
+- **Key Matching**: The `copy_to` key must match the exact parameter name expected by the target API endpoint.
 
 ---
 
@@ -202,5 +181,5 @@ Copy from multiple prior nodes in a single `copy_params` array:
 
 - [`04-parameter-node.md`](./04-parameter-node.md) — Parameter collection and value storage
 - [`05-api-call-node.md`](./05-api-call-node.md) — API call node and response storage
-- [`parameter-validation.md`](./parameter-validation.md) — `copy_params` inside validation API calls
+- [`parameter-validation.md`](./parameter-validation.md) — Using `copy_params` inside validation API calls
 - [`03-node-types-and-structure.md`](./03-node-types-and-structure.md) — `__SOFT_STORAGE__` reference
